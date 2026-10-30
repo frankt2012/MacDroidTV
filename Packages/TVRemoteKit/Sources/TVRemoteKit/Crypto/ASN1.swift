@@ -170,7 +170,4 @@ enum DERCoding {
         )
     }
 
-    static func hexString(_ data: Data) -> String {
-        data.map { String(format: "%02X", $0) }.joined()
-    }
 }

@@ -38,10 +38,10 @@ public enum PairingSecret {
         let server = try rsaNumbers(certificateDER: serverCertificateDER)
 
         var hasher = SHA256()
-        hasher.update(data: try hexBytes(client.modulusHex))
-        hasher.update(data: try hexBytes("0" + client.exponentHex))
-        hasher.update(data: try hexBytes(server.modulusHex))
-        hasher.update(data: try hexBytes("0" + server.exponentHex))
+        hasher.update(data: client.modulus)
+        hasher.update(data: client.exponent)
+        hasher.update(data: server.modulus)
+        hasher.update(data: server.exponent)
         hasher.update(data: try hexBytes(String(normalized.dropFirst(2))))
 
         let digest = Data(hasher.finalize())
@@ -51,7 +51,13 @@ public enum PairingSecret {
         return digest
     }
 
-    static func rsaNumbers(certificateDER: Data) throws -> (modulusHex: String, exponentHex: String) {
+    /// Returns the RSA public numbers as minimal big-endian bytes.
+    ///
+    /// The protocol hashes `f"{n:X}"` and `f"0{e:X}"` in the Python reference
+    /// implementation. For a 2048-bit modulus and the usual 65537 exponent that
+    /// is exactly the minimal byte representation of each integer, which is what
+    /// `DERCoding` returns after stripping DER's leading zero.
+    static func rsaNumbers(certificateDER: Data) throws -> (modulus: Data, exponent: Data) {
         guard let certificate = SecCertificateCreateWithData(nil, certificateDER as CFData),
               let publicKey = SecCertificateCopyKey(certificate) else {
             throw PairingError.certificateReadFailed
@@ -62,11 +68,7 @@ public enum PairingSecret {
             throw PairingError.certificateReadFailed
         }
 
-        let numbers = try DERCoding.rsaPublicNumbers(fromPKCS1: pkcs1)
-        return (
-            modulusHex: DERCoding.hexString(numbers.modulus),
-            exponentHex: DERCoding.hexString(numbers.exponent)
-        )
+        return try DERCoding.rsaPublicNumbers(fromPKCS1: pkcs1)
     }
 
     static func hexBytes(_ hex: String) throws -> Data {

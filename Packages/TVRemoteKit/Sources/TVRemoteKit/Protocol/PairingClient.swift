@@ -33,18 +33,21 @@ public actor PairingClient {
             throw TVConnectionError.tls(error.localizedDescription)
         }
 
-        var capturedCertificate: Data?
+        // The verify block is called once per certificate in the peer chain.
+        // Keep the first one (the leaf), which is the certificate the TV uses
+        // to derive the pairing secret.
+        let certificateBox = CertificateBox()
         let newFrame = try FrameConnection(
             host: host,
             port: port,
             identity: secIdentity,
-            onPeerCertificate: { capturedCertificate = $0 }
+            onPeerCertificate: { certificateBox.captureIfEmpty($0) }
         )
         frame = newFrame
 
         do {
             try await newFrame.connect(timeout: timeout)
-            guard let certificate = capturedCertificate else {
+            guard let certificate = certificateBox.certificate else {
                 throw TVConnectionError.tls("The TV did not present a certificate.")
             }
             serverCertificate = certificate
@@ -120,6 +123,26 @@ public actor PairingClient {
 
     public func serverCertificateDER() -> Data? {
         serverCertificate
+    }
+
+    /// Thread-safe holder for the first certificate in the peer chain.
+    private final class CertificateBox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var stored: Data?
+
+        func captureIfEmpty(_ certificate: Data) {
+            lock.lock()
+            if stored == nil {
+                stored = certificate
+            }
+            lock.unlock()
+        }
+
+        var certificate: Data? {
+            lock.lock()
+            defer { lock.unlock() }
+            return stored
+        }
     }
 
     private func receive() async throws -> OuterMessage {

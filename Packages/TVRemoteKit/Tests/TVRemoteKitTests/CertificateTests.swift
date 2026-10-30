@@ -33,7 +33,9 @@ final class CertificateTests: XCTestCase {
     func testCertificateHasRSAKey() throws {
         let generated = try CertificateFactory.generate(commonName: "TVRemoteKit Test")
         let numbers = try PairingSecret.rsaNumbers(certificateDER: generated.certificateDER)
-        XCTAssertEqual(numbers.exponentHex, "010001")
-        XCTAssertEqual(numbers.modulusHex.count, 512)
+        // 65537 is the standard RSA exponent and must hash as 01 00 01, not
+        // 00 01 00 01 (the old double-padded bug).
+        XCTAssertEqual(numbers.exponent, Data([0x01, 0x00, 0x01]))
+        XCTAssertEqual(numbers.modulus.count, 256)
     }
 }

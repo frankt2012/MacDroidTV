@@ -115,16 +115,15 @@ final class PairingSecretTests: XCTestCase {
         suffix: String
     ) throws -> Data {
         var hasher = SHA256()
+        // The protocol hashes the minimal big-endian RSA numbers. Keeping this
+        // independent of the production hex conversion is what catches the
+        // "double-padded exponent" regression.
         hasher.update(data: numbers.modulus)
-        hasher.update(data: hexBytes("0" + hex(numbers.exponent)))
+        hasher.update(data: numbers.exponent)
         hasher.update(data: numbers.modulus)
-        hasher.update(data: hexBytes("0" + hex(numbers.exponent)))
+        hasher.update(data: numbers.exponent)
         hasher.update(data: hexBytes(suffix))
         return Data(hasher.finalize())
-    }
-
-    private static func hex(_ data: Data) -> String {
-        data.map { String(format: "%02X", $0) }.joined()
     }
 
     private static func hexBytes(_ hex: String) -> Data {
