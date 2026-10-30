@@ -210,15 +210,20 @@ struct TVRemoteWidgetEntryView: View {
 
     private var volumeText: String {
         if entry.snapshot.muted { return "Muted" }
-        guard let volume = entry.snapshot.volume else { return "—" }
-        return "\(volume)"
+        guard let volume = entry.snapshot.volume,
+              let max = entry.snapshot.volumeMax,
+              max > 0 else { return "—" }
+        return entry.snapshot.volumeEstimated ? "≈\(volume)" : "\(volume)"
     }
 
     private var statusText: String {
         let power = entry.snapshot.isOn ? "On" : "Standby"
         if entry.snapshot.muted { return "\(power) · Muted" }
-        if let volume = entry.snapshot.volume {
-            return "\(power) · Volume \(volume)"
+        if let volume = entry.snapshot.volume,
+           let max = entry.snapshot.volumeMax,
+           max > 0 {
+            let prefix = entry.snapshot.volumeEstimated ? "Volume ≈" : "Volume"
+            return "\(power) · \(prefix)\(volume)"
         }
         return power
     }

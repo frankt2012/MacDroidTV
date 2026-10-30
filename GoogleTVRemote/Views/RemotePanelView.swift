@@ -177,8 +177,13 @@ struct RemotePanelView: View {
                     Text(model.volumeText)
                         .font(.caption)
                     Spacer()
-                    if let level = model.state.cache.volume,
-                       let max = model.state.cache.volumeMax {
+                    if model.isVolumeEstimated {
+                        Text("estimated")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    } else if let level = model.state.cache.volume,
+                              let max = model.state.cache.volumeMax,
+                              max > 0 {
                         Text("\(level) / \(max)")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
