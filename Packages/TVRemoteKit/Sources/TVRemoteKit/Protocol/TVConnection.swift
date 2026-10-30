@@ -14,6 +14,7 @@ public actor TVConnection {
     public let device: PairedDevice
     private let identity: StoredIdentity
     private let onEvent: (@Sendable (TVEvent) -> Void)?
+    private let debugLog: (@Sendable (String) -> Void)?
 
     private var frame: FrameConnection?
     private var readTask: Task<Void, Never>?
@@ -28,11 +29,13 @@ public actor TVConnection {
     public init(
         device: PairedDevice,
         identity: StoredIdentity,
-        onEvent: (@Sendable (TVEvent) -> Void)? = nil
+        onEvent: (@Sendable (TVEvent) -> Void)? = nil,
+        debugLog: (@Sendable (String) -> Void)? = nil
     ) {
         self.device = device
         self.identity = identity
         self.onEvent = onEvent
+        self.debugLog = debugLog
     }
 
     public func connect() async throws {
@@ -46,6 +49,7 @@ public actor TVConnection {
     public func sendKey(_ key: RemoteKey) async throws {
         try await ensureReady()
         guard let frame else { throw TVConnectionError.notPaired }
+        log("-> key \(key.rawValue) code=\(key.keyCode)")
 
         do {
             try await frame.send(RemoteMessage.keyInject(key.keyCode))
@@ -103,6 +107,7 @@ public actor TVConnection {
 
     private func performConnect() async throws {
         disconnectInternal()
+        log("connect host=\(device.host):\(device.port)")
 
         let secIdentity: SecIdentity
         do {
@@ -124,6 +129,9 @@ public actor TVConnection {
             while true {
                 let data = try await newFrame.receive(timeout: 10)
                 let message = try RemoteMessage.decode(data)
+                if let text = Self.describe(message) {
+                    log("<- \(text) raw=\(Self.hex(data))")
+                }
 
                 switch message {
                 case .configure(let supportedFeatures, let info):
@@ -158,6 +166,7 @@ public actor TVConnection {
                 }
             }
         } catch {
+            log("connect failed: \(error.localizedDescription)")
             newFrame.close()
             if frame === newFrame {
                 frame = nil
@@ -179,6 +188,9 @@ public actor TVConnection {
                 do {
                     let data = try await frame.receive(timeout: 120)
                     let message = try RemoteMessage.decode(data)
+                    if let text = Self.describe(message) {
+                        self.log("<- \(text) raw=\(Self.hex(data))")
+                    }
                     await self.handle(message, generation: generation)
                 } catch {
                     await self.handleDisconnect(error, generation: generation)
@@ -228,5 +240,48 @@ public actor TVConnection {
         frame?.close()
         frame = nil
         ready = false
+    }
+
+    // MARK: - Debug logging
+
+    private nonisolated func log(_ line: String) {
+        guard let debugLog else { return }
+        let stamp = ISO8601DateFormatter().string(from: Date())
+        debugLog("[\(stamp)] \(line)")
+    }
+
+    private nonisolated static func hex(_ data: Data) -> String {
+        data.map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// Human-readable form of a received message, or `nil` for keepalive pings
+    /// (which would otherwise flood the debug log).
+    private static func describe(_ message: RemoteMessage) -> String? {
+        switch message {
+        case .configure(let features, let info):
+            return "configure features=\(features) device=\(info.vendor)/\(info.model)/\(info.appVersion)"
+        case .setActive(let active):
+            return "setActive \(active)"
+        case .error:
+            return "error"
+        case .pingRequest:
+            return nil
+        case .pingResponse:
+            return nil
+        case .keyInject(let code, let direction):
+            return "keyInject \(code) dir=\(direction)"
+        case .appInfo(let package):
+            return "appInfo \(package)"
+        case .imeBatchEdit(let ime, let field):
+            return "imeBatchEdit \(ime) \(field)"
+        case .remoteStart(let started):
+            return "remoteStart \(started)"
+        case .volume(let level, let max, let muted):
+            return "volume level=\(level) max=\(max) muted=\(muted)"
+        case .appLink(let link):
+            return "appLink \(link)"
+        case .unknown:
+            return "unknown"
+        }
     }
 }

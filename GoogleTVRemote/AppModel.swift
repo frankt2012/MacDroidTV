@@ -50,6 +50,13 @@ final class AppModel {
             loaded.clientName = Host.current().localizedName ?? "Mac Remote"
             store.replace(with: loaded)
         }
+        // Older builds cached the 0/0 volume some TVs report when they do not
+        // expose a volume scale. Treat that as "unknown" instead of "0".
+        if loaded.cache.volumeMax == 0 {
+            loaded.cache.volume = nil
+            loaded.cache.volumeMax = nil
+            store.replace(with: loaded)
+        }
         state = loaded
 
         discovery.onChange = { [weak self] devices in
@@ -87,9 +94,13 @@ final class AppModel {
 
     var volumeText: String {
         if state.cache.muted { return "Muted" }
-        guard let level = state.cache.volume else { return "Volume —" }
+        guard let max = state.cache.volumeMax, max > 0,
+              let level = state.cache.volume else { return "Volume —" }
+        if isVolumeEstimated { return "Volume ≈ \(level)" }
         return "Volume \(level)"
     }
+
+    var isVolumeEstimated: Bool { state.cache.volumeEstimated == true }
 
     var statusText: String {
         switch status {
@@ -152,13 +163,63 @@ final class AppModel {
         status = .connecting
         lastError = nil
 
+        var connected = false
+        do {
+            try await establishConnection(to: device, host: device.host, identity: identity)
+            connected = true
+        } catch {
+            // A saved host can go stale when the TV's DHCP lease or link-local
+            // address changes. Only ask Bonjour after the saved host fails:
+            // resolving first opens an extra connection, which can race the
+            // TV's single-session handling.
+            if let resolved = await resolvedHost(for: device), resolved != device.host {
+                do {
+                    try await establishConnection(to: device, host: resolved, identity: identity)
+                    connected = true
+                    mutateState { state in
+                        if let index = state.devices.firstIndex(where: { $0.id == device.id }) {
+                            state.devices[index].host = resolved
+                        }
+                    }
+                } catch {
+                    reportConnectFailure(error)
+                }
+            } else {
+                reportConnectFailure(error)
+            }
+        }
+
+        connectingDeviceID = nil
+        if connected {
+            status = .connected
+            markSeen(device)
+        }
+    }
+
+    /// Opens a connection to `host` and waits for the handshake to finish.
+    ///
+    /// On success the connection and the cache are up to date. On failure the
+    /// half-open connection is torn down and the error is rethrown.
+    private func establishConnection(
+        to device: PairedDevice,
+        host: String,
+        identity: StoredIdentity
+    ) async throws {
+        var target = device
+        target.host = host
+
         let newConnection = TVConnection(
-            device: device,
+            device: target,
             identity: identity,
             onEvent: { [weak self] event in
                 Task { @MainActor [weak self] in
                     self?.handle(event, deviceID: device.id)
                 }
+            },
+            debugLog: { line in
+                #if DEBUG
+                SharedStore.shared.appendDebugLog(line)
+                #endif
             }
         )
         connection = newConnection
@@ -168,21 +229,21 @@ final class AppModel {
             try await newConnection.connect()
             let isOn = await newConnection.isOn
             let volume = await newConnection.volumeInfo
-
-            connectingDeviceID = nil
             status = .connected
-            markSeen(device)
             updateCache(isOn: isOn, volume: volume)
         } catch {
-            connectingDeviceID = nil
             await newConnection.disconnect()
             if connection === newConnection {
                 connection = nil
                 connectionDeviceID = nil
             }
-            status = .failed(error.localizedDescription)
-            lastError = error.localizedDescription
+            throw error
         }
+    }
+
+    private func reportConnectFailure(_ error: Error) {
+        status = .failed(error.localizedDescription)
+        lastError = error.localizedDescription
     }
 
     func disconnect() async {
@@ -247,6 +308,43 @@ final class AppModel {
         return nil
     }
 
+    /// Current Bonjour address for a paired TV, if it is currently discoverable.
+    private func resolvedHost(for device: PairedDevice) async -> String? {
+        guard let discoveredDevice = discovered.first(where: {
+            $0.name == device.name || $0.serviceName == device.name
+        }) else {
+            return nil
+        }
+        return await discovery.resolveHost(for: discoveredDevice.serviceName)
+    }
+
+    #if DEBUG
+    /// Developer hook behind the `--key-test` CLI flag. Sends keys through the
+    /// same path as the UI, so the cached state ends up exactly as it would
+    /// after clicking the buttons.
+    func sendForTesting(_ keys: [RemoteKey]) async {
+        func waiting() -> Bool {
+            switch status {
+            case .connecting: return true
+            case .idle: return state.activeDevice != nil
+            default: return false
+            }
+        }
+
+        for _ in 0..<150 where waiting() {
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+        if case .connected = status {} else {
+            await connectToActiveDeviceIfNeeded()
+        }
+
+        for key in keys {
+            await performSend(key)
+            try? await Task.sleep(nanoseconds: 800_000_000)
+        }
+    }
+    #endif
+
     private func performSend(_ key: RemoteKey) async {
         guard let connection = await ensureConnection() else { return }
 
@@ -254,23 +352,11 @@ final class AppModel {
             try await connection.sendKey(key)
             let isOn = await connection.isOn
             let volume = await connection.volumeInfo
+            let hasVolumeFeedback = (volume?.max ?? 0) > 0
 
             updateCache(isOn: isOn, volume: volume) { state in
-                guard volume == nil else { return }
-                switch key {
-                case .volumeUp:
-                    if let level = state.cache.volume, let max = state.cache.volumeMax {
-                        state.cache.volume = min(level + 1, max)
-                    }
-                case .volumeDown:
-                    if let level = state.cache.volume {
-                        state.cache.volume = max(level - 1, 0)
-                    }
-                case .mute:
-                    state.cache.muted.toggle()
-                default:
-                    break
-                }
+                guard !hasVolumeFeedback else { return }
+                VolumeEstimate.apply(key, to: &state.cache)
             }
         } catch {
             lastError = error.localizedDescription
@@ -292,10 +378,16 @@ final class AppModel {
             updateCache(isOn: isOn, volume: nil)
 
         case .volume(let level, let max, let muted):
+            // A max of zero means the TV did not report a volume scale. Several
+            // TVs send 0/0 when audio is handled outside the Android TV service
+            // (the TV's own audio pipeline, an AVR, or CEC). Caching that would
+            // display a bogus "Volume 0".
+            guard max > 0 else { return }
             mutateState { state in
                 state.cache.volume = level
                 state.cache.volumeMax = max
                 state.cache.muted = muted
+                state.cache.volumeEstimated = false
                 state.cache.updatedAt = Date()
             }
 
@@ -316,10 +408,11 @@ final class AppModel {
     ) {
         mutateState { state in
             state.cache.isOn = isOn
-            if let volume {
+            if let volume, volume.max > 0 {
                 state.cache.volume = volume.level
                 state.cache.volumeMax = volume.max
                 state.cache.muted = volume.muted
+                state.cache.volumeEstimated = false
             }
             extra?(&state)
             state.cache.updatedAt = Date()

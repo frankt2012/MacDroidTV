@@ -109,25 +109,42 @@ Packages/TVRemoteKit/           Shared protocol, crypto, storage, intents
     Proto/                      Hand-rolled protobuf encode/decode
     Protocol/                   TLS framing, pairing, command connection
     Storage/                    App Group JSON store
-  Tests/TVRemoteKitTests/       30 unit tests
+  Tests/TVRemoteKitTests/       37 unit tests
 project.yml                     XcodeGen project definition
 ```
 
 ## Diagnostics
 
-The app binary has three terminal flags that are useful when the UI cannot show
+The app binary has several terminal flags that are useful when the UI cannot show
 what is happening:
 
 ```sh
 APP="$HOME/Applications/GoogleTVRemote.app/Contents/MacOS/GoogleTVRemote"
 
-"$APP" --diagnose      # container path, device count, identity presence, save errors
+"$APP" --diagnose      # container path, device count, cached state, debug log tail
 "$APP" --write-test    # writes and reads back a marker, then restores state
 "$APP" --reset-state   # deletes the shared state file
+"$APP" --volume-probe  # sends volume up/down/mute and logs every protocol frame
+open -a "$HOME/Applications/GoogleTVRemote.app" \
+  --args --key-test volumeUp volumeDown  # sends keys through the app itself
 ```
 
 `--diagnose` deliberately does not print the state file, because it contains the
 pairing private key.
+
+`--volume-probe` changes the TV volume briefly (three up, three down, mute
+twice), so the net effect is zero. Because macOS ties local-network permission to
+the app bundle, run it through LaunchServices rather than from a shell if the
+terminal-launched process cannot reach the TV:
+
+```sh
+open -a "$HOME/Applications/GoogleTVRemote.app" --args --volume-probe
+# then wait for it to finish and inspect the tail:
+"$APP" --diagnose
+```
+
+`--key-test` is Debug-only. It sends the named keys through the same code path as
+the buttons, which makes it possible to check the cached volume without clicking.
 
 ## Tests
 
@@ -137,13 +154,19 @@ swift test
 ```
 
 The tests cover protobuf round-trips, key-injection bytes, certificate
-generation, identity recreation, and pairing-secret derivation.
+generation, identity recreation, pairing-secret derivation, and the local volume
+estimate.
 
 ## Status and limitations
 
-- Built and unit-tested, but **not yet exercised against a physical Google TV**
-  in this environment. Pairing and command behavior are implemented from the
-  documented protocol and the `androidtvremote2` reference implementation.
+- Built and unit-tested against a physical TCL Google TV for pairing, power,
+  navigation, and volume keys.
+- **Some TVs do not report their volume over this protocol.** The TCL used for
+  development answers `RemoteSetVolumeLevel` with `volume_max = 0` and
+  `volume_level = 0` on every volume change, so the actual speaker volume cannot
+  be read. The app ignores that 0/0 report and falls back to a local estimate
+  that moves with the volume keys; it is labelled `≈` and `estimated` in the UI.
+  TVs that do report a real scale show the exact level instead.
 - The widget's App Intent buttons require macOS 14+ and a signed build; they do
   not work in Xcode Previews.
 - This is a personal-use project, not an App Store submission. Hardened runtime

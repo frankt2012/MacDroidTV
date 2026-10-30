@@ -83,6 +83,34 @@ public final class SharedStore: @unchecked Sendable {
         return loadLocked()
     }
 
+    /// Appends a line to `debug.log` next to the state file. Development builds
+    /// use this to capture protocol traffic that is hard to see from the UI.
+    public func appendDebugLog(_ line: String) {
+        guard let fileURL else { return }
+        let url = fileURL.deletingLastPathComponent().appendingPathComponent("debug.log")
+        let entry = Data((line + "\n").utf8)
+
+        lock.lock()
+        defer { lock.unlock() }
+
+        if let handle = try? FileHandle(forWritingTo: url) {
+            defer { try? handle.close() }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: entry)
+        } else {
+            try? entry.write(to: url, options: .atomic)
+        }
+    }
+
+    public func debugLogTail(maxLines: Int = 60) -> [String] {
+        guard let fileURL else { return [] }
+        let url = fileURL.deletingLastPathComponent().appendingPathComponent("debug.log")
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
+        return text.split(separator: "\n", omittingEmptySubsequences: true)
+            .suffix(maxLines)
+            .map(String.init)
+    }
+
     private func loadLocked() -> RemoteState {
         if let cached {
             return cached

@@ -60,19 +60,25 @@ public struct CachedTVState: Codable, Equatable, Sendable {
     public var volumeMax: Int?
     public var muted: Bool
     public var updatedAt: Date?
+    /// True when the TV does not report a volume scale and the value is a
+    /// local estimate driven by key presses. Optional so state files written by
+    /// older builds still decode.
+    public var volumeEstimated: Bool?
 
     public init(
         isOn: Bool = false,
         volume: Int? = nil,
         volumeMax: Int? = nil,
         muted: Bool = false,
-        updatedAt: Date? = nil
+        updatedAt: Date? = nil,
+        volumeEstimated: Bool? = nil
     ) {
         self.isOn = isOn
         self.volume = volume
         self.volumeMax = volumeMax
         self.muted = muted
         self.updatedAt = updatedAt
+        self.volumeEstimated = volumeEstimated
     }
 }
 
@@ -130,6 +136,7 @@ public struct WidgetSnapshot: Equatable, Sendable {
     public var volumeMax: Int?
     public var muted: Bool
     public var updatedAt: Date?
+    public var volumeEstimated: Bool
 
     public init(
         isPaired: Bool,
@@ -138,7 +145,8 @@ public struct WidgetSnapshot: Equatable, Sendable {
         volume: Int?,
         volumeMax: Int?,
         muted: Bool,
-        updatedAt: Date?
+        updatedAt: Date?,
+        volumeEstimated: Bool = false
     ) {
         self.isPaired = isPaired
         self.deviceName = deviceName
@@ -147,6 +155,7 @@ public struct WidgetSnapshot: Equatable, Sendable {
         self.volumeMax = volumeMax
         self.muted = muted
         self.updatedAt = updatedAt
+        self.volumeEstimated = volumeEstimated
     }
 
     public static func load(from store: SharedStore = .shared) -> WidgetSnapshot {
@@ -159,7 +168,8 @@ public struct WidgetSnapshot: Equatable, Sendable {
             volume: state.cache.volume,
             volumeMax: state.cache.volumeMax,
             muted: state.cache.muted,
-            updatedAt: state.cache.updatedAt
+            updatedAt: state.cache.updatedAt,
+            volumeEstimated: state.cache.volumeEstimated ?? false
         )
     }
 }
