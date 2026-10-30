@@ -46,6 +46,17 @@ public enum PairingSecret {
 
         let digest = Data(hasher.finalize())
         guard digest.first == prefix else {
+            #if DEBUG
+            // Helpful when a TV rejects the code: shows whether the local
+            // prefix check failed and what the RSA numbers looked like.
+            NSLog(
+                "Pairing code mismatch: entered=%02X computed=%02X clientExp=%d serverExp=%d",
+                prefix,
+                digest.first ?? 0,
+                client.exponent.count,
+                server.exponent.count
+            )
+            #endif
             throw PairingError.codeMismatch
         }
         return digest
