@@ -25,7 +25,7 @@ public enum VolumeEstimate {
             }
 
             let current = cache.volume ?? maxVolume / 2
-            let step = Swift.max(1, maxVolume / 50)
+            let step = cache.volumeStep ?? Swift.max(1, maxVolume / 50)
             let delta = key == .volumeUp ? step : -step
             cache.volume = Swift.min(Swift.max(current + delta, 0), maxVolume)
             cache.volumeEstimated = true
@@ -39,5 +39,18 @@ public enum VolumeEstimate {
         default:
             return false
         }
+    }
+
+    /// Re-baselines the estimate to a volume read off the TV, and sets how much
+    /// each key press changes it.
+    @discardableResult
+    public static func sync(level: Int, step: Int, to cache: inout CachedTVState) -> Bool {
+        let existing = cache.volumeMax ?? 0
+        let maxVolume = existing > 0 ? existing : defaultMax
+        cache.volume = Swift.min(Swift.max(level, 0), maxVolume)
+        cache.volumeMax = maxVolume
+        cache.volumeStep = Swift.min(Swift.max(step, 1), 20)
+        cache.volumeEstimated = true
+        return true
     }
 }

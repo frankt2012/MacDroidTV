@@ -4,6 +4,7 @@ import TVRemoteKit
 
 struct RemotePanelView: View {
     @Bindable var model: AppModel
+    @State private var showingVolumeSync = false
 
     var body: some View {
         VStack(spacing: 12) {
@@ -27,6 +28,9 @@ struct RemotePanelView: View {
         .frame(width: 340)
         .sheet(isPresented: $model.showingDevices) {
             DevicesView(model: model)
+        }
+        .popover(isPresented: $showingVolumeSync, arrowEdge: .bottom) {
+            VolumeSyncView(model: model)
         }
     }
 
@@ -194,6 +198,17 @@ struct RemotePanelView: View {
 
             keyButton(.volumeUp, "speaker.plus", size: 34)
             keyButton(.mute, "speaker.slash", size: 34)
+            if model.isVolumeEstimated || model.state.cache.volume == nil {
+                Button {
+                    showingVolumeSync = true
+                } label: {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 14))
+                        .frame(width: 26, height: 26)
+                }
+                .buttonStyle(.borderless)
+                .help("Sync volume")
+            }
         }
         .padding(.horizontal, 4)
     }
@@ -269,5 +284,68 @@ struct RemotePanelView: View {
         .buttonStyle(.plain)
         .font(.caption)
         .foregroundStyle(.secondary)
+    }
+}
+
+// MARK: - Volume sync
+
+struct VolumeSyncView: View {
+    @Bindable var model: AppModel
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var level: Int = 50
+    @State private var step: Int = 2
+
+    private var maxVolume: Int { model.volumeScaleMax }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Sync volume")
+                .font(.headline)
+
+            Text("This TV does not report its volume. Set the TV to a known level with its own remote, then sync once. The bar tracks your presses from there.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text("TV volume now")
+                    Spacer()
+                    Text("\(level)")
+                        .monospacedDigit()
+                }
+                Slider(value: Binding(get: { Double(level) },
+                                      set: { level = Int($0.rounded()) }),
+                       in: 0...Double(maxVolume))
+            }
+
+            HStack {
+                Text("Each press changes by")
+                Spacer()
+                Stepper(value: $step, in: 1...10) {
+                    Text("\(step)")
+                        .monospacedDigit()
+                }
+            }
+
+            HStack {
+                Button("Cancel") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Spacer()
+                Button("Sync") {
+                    model.syncVolume(level: level, step: step)
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+            .padding(.top, 4)
+        }
+        .padding(16)
+        .frame(width: 260)
+        .onAppear {
+            level = model.state.cache.volume ?? maxVolume / 2
+            step = model.volumeStep
+        }
     }
 }

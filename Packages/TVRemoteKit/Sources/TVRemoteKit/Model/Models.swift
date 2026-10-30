@@ -64,6 +64,9 @@ public struct CachedTVState: Codable, Equatable, Sendable {
     /// local estimate driven by key presses. Optional so state files written by
     /// older builds still decode.
     public var volumeEstimated: Bool?
+    /// How much one volume key press changes the estimate, when the user has
+    /// calibrated it. `nil` means use the default derived from the scale.
+    public var volumeStep: Int?
 
     public init(
         isOn: Bool = false,
@@ -71,7 +74,8 @@ public struct CachedTVState: Codable, Equatable, Sendable {
         volumeMax: Int? = nil,
         muted: Bool = false,
         updatedAt: Date? = nil,
-        volumeEstimated: Bool? = nil
+        volumeEstimated: Bool? = nil,
+        volumeStep: Int? = nil
     ) {
         self.isOn = isOn
         self.volume = volume
@@ -79,6 +83,7 @@ public struct CachedTVState: Codable, Equatable, Sendable {
         self.muted = muted
         self.updatedAt = updatedAt
         self.volumeEstimated = volumeEstimated
+        self.volumeStep = volumeStep
     }
 }
 

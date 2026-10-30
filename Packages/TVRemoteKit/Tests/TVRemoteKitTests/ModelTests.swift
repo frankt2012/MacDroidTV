@@ -12,6 +12,7 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(state.volume, 10)
         XCTAssertEqual(state.volumeMax, 100)
         XCTAssertNil(state.volumeEstimated)
+        XCTAssertNil(state.volumeStep)
     }
 
     func testCachedStateRoundTripsEstimatedVolume() throws {
@@ -89,5 +90,29 @@ final class ModelTests: XCTestCase {
 
         VolumeEstimate.apply(.mute, to: &cache)
         XCTAssertFalse(cache.muted)
+    }
+
+    func testVolumeEstimateUsesCalibratedStep() {
+        var cache = CachedTVState(volume: 50, volumeMax: 100, volumeStep: 5)
+
+        VolumeEstimate.apply(.volumeUp, to: &cache)
+        XCTAssertEqual(cache.volume, 55)
+        XCTAssertEqual(cache.volumeStep, 5)
+    }
+
+    func testVolumeEstimateSyncBaselinesAndClamps() {
+        var cache = CachedTVState()
+
+        VolumeEstimate.sync(level: 200, step: 0, to: &cache)
+        XCTAssertEqual(cache.volume, 100)
+        XCTAssertEqual(cache.volumeMax, 100)
+        XCTAssertEqual(cache.volumeStep, 1)
+        XCTAssertEqual(cache.volumeEstimated, true)
+
+        var cache2 = CachedTVState(volume: 10, volumeMax: 80)
+        VolumeEstimate.sync(level: 50, step: 3, to: &cache2)
+        XCTAssertEqual(cache2.volume, 50)
+        XCTAssertEqual(cache2.volumeMax, 80)
+        XCTAssertEqual(cache2.volumeStep, 3)
     }
 }

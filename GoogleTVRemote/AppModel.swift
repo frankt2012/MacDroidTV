@@ -101,6 +101,20 @@ final class AppModel {
     }
 
     var isVolumeEstimated: Bool { state.cache.volumeEstimated == true }
+    var volumeScaleMax: Int {
+        let maxVolume = state.cache.volumeMax ?? 0
+        return maxVolume > 0 ? maxVolume : VolumeEstimate.defaultMax
+    }
+    var volumeStep: Int {
+        state.cache.volumeStep ?? max(1, volumeScaleMax / 50)
+    }
+
+    func syncVolume(level: Int, step: Int) {
+        mutateState { state in
+            VolumeEstimate.sync(level: level, step: step, to: &state.cache)
+            state.cache.updatedAt = Date()
+        }
+    }
 
     var statusText: String {
         switch status {
