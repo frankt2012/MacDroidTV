@@ -164,6 +164,27 @@ struct GoogleTVRemoteApp: App {
             }
         }
         #endif
+
+        #if DEBUG
+        if let index = CommandLine.arguments.firstIndex(of: "--widget-test") {
+            let raw = CommandLine.arguments.dropFirst(index + 1).first ?? "power"
+            guard let key = RemoteKey(rawValue: raw) else {
+                print("unknown key \(raw)")
+                exit(2)
+            }
+            Task {
+                do {
+                    try await WidgetRemote.shared.send(key)
+                    print("widget send \(raw) OK")
+                } catch {
+                    print("widget send \(raw) FAILED: \(error)")
+                }
+                let cache = SharedStore.shared.load().cache
+                print("isOn=\(cache.isOn) volume=\(cache.volume.map(String.init) ?? "nil") muted=\(cache.muted)")
+                exit(0)
+            }
+        }
+        #endif
     }
 
     var body: some Scene {

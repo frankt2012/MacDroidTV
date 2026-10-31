@@ -12,6 +12,7 @@ public actor WidgetRemote {
     private var connection: TVConnection?
     private var connectionDeviceID: UUID?
     private var connectionOpened: Date?
+    private let discovery = TVDiscovery()
 
     public func send(_ key: RemoteKey) async throws {
         let state = store.load()
@@ -30,18 +31,27 @@ public actor WidgetRemote {
             try? await Task.sleep(nanoseconds: 1_000_000_000)
         }
 
-        var connection = try? await openConnection(
-            for: device,
-            identity: identity,
-            timeout: sentWakePacket ? 3 : 10
-        )
-        if connection == nil, sentWakePacket {
-            try? await Task.sleep(nanoseconds: 1_200_000_000)
-            connection = try? await openConnection(
+        var connection: TVConnection?
+        do {
+            connection = try await openConnection(
                 for: device,
                 identity: identity,
-                timeout: 3
+                timeout: sentWakePacket ? 3 : 10
             )
+        } catch {
+            SharedStore.shared.appendDebugLog("[widget] openConnection1 failed: \(error)")
+        }
+        if connection == nil, sentWakePacket {
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            do {
+                connection = try await openConnection(
+                    for: device,
+                    identity: identity,
+                    timeout: 3
+                )
+            } catch {
+                SharedStore.shared.appendDebugLog("[widget] openConnection2 failed: \(error)")
+            }
         }
         guard let connection else { throw TVConnectionError.closed }
 
@@ -130,13 +140,66 @@ public actor WidgetRemote {
             await connection.disconnect()
         }
 
-        let newConnection = TVConnection(device: device, identity: identity)
-        try await newConnection.connect(timeout: timeout)
+        // Try the saved host first; if it fails, ask Bonjour for a fresh
+        // address. The saved link-local address can go stale or be scoped to
+        // an interface the widget process cannot reach.
+        var hostsToTry: [String] = [device.host]
 
-        connection = newConnection
-        connectionDeviceID = device.id
-        connectionOpened = Date()
-        return newConnection
+        // Bonjour fallback: the saved link-local address may be scoped to an
+        // interface the widget process cannot reach. Browse briefly and resolve
+        // a fresh address the way the app's connect() does.
+        discovery.start()
+        let discovered: [DiscoveredDevice] = await withCheckedContinuation { cont in
+            var done = false
+            discovery.onChange = { devices in
+                guard !done else { return }
+                if !devices.isEmpty {
+                    done = true
+                    cont.resume(returning: devices)
+                }
+            }
+            Task {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                if !done {
+                    done = true
+                    cont.resume(returning: [])
+                }
+            }
+        }
+        var resolvedHost: String?
+        if let match = discovered.first(where: { $0.name == device.name || $0.serviceName == device.name }) {
+            resolvedHost = await discovery.resolveHost(for: match.serviceName, timeout: 3)
+        }
+        discovery.stop()
+        if let resolved = resolvedHost, !hostsToTry.contains(resolved) {
+            hostsToTry.append(resolved)
+        }
+
+        var lastError: Error?
+        for host in hostsToTry {
+            let newConnection = TVConnection(
+                device: { var d = device; d.host = host; return d }(),
+                identity: identity,
+                debugLog: { line in
+                    #if DEBUG
+                    SharedStore.shared.appendDebugLog(line)
+                    #endif
+                }
+            )
+            do {
+                try await newConnection.connect(timeout: timeout)
+                connection = newConnection
+                connectionDeviceID = device.id
+                connectionOpened = Date()
+                // (connection succeeded)
+                return newConnection
+            } catch {
+                lastError = error
+
+                await newConnection.disconnect()
+            }
+        }
+        throw lastError ?? TVConnectionError.closed
     }
 }
 
@@ -145,6 +208,8 @@ public struct RemoteKeyIntent: AppIntent {
     public static var title: LocalizedStringResource = "Send TV Remote Key"
     public static var description = IntentDescription("Sends a key press to your Google TV.")
     public static var isDiscoverable: Bool = false
+    @available(macOS 26.0, iOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *)
+    public static var supportedModes: IntentModes { .background }
 
     @Parameter(title: "Key")
     public var key: String
@@ -156,10 +221,8 @@ public struct RemoteKeyIntent: AppIntent {
     }
 
     public func perform() async throws -> some IntentResult {
-        guard let remoteKey = RemoteKey(rawValue: key) else {
-            return .result()
-        }
-        try await WidgetRemote.shared.send(remoteKey)
+        guard let remoteKey = RemoteKey(rawValue: key) else { return .result() }
+        try? await WidgetRemote.shared.send(remoteKey)
         return .result()
     }
 }
@@ -169,6 +232,8 @@ public struct RefreshTVStateIntent: AppIntent {
     public static var title: LocalizedStringResource = "Refresh TV Status"
     public static var description = IntentDescription("Asks your Google TV for its current power and volume state.")
     public static var isDiscoverable: Bool = false
+    @available(macOS 26.0, iOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *)
+    public static var supportedModes: IntentModes { .background }
 
     public init() {}
 

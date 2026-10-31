@@ -36,8 +36,6 @@ struct TVRemoteProvider: TimelineProvider {
     }
 
     private func makeEntry() -> TVRemoteEntry {
-        // The widget process may be reused; make sure we see the app's latest
-        // write instead of an in-memory copy from an earlier timeline.
         SharedStore.shared.invalidateCache()
         return TVRemoteEntry(date: Date(), snapshot: WidgetSnapshot.load())
     }
