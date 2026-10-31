@@ -32,6 +32,9 @@ final class AppModel {
     /// True while a sleeping TV is being woken, so extra power presses cannot
     /// toggle it back off mid-wake.
     private(set) var isWaking = false
+    /// When the TV last woke, so boot-time volume reports do not clobber a
+    /// volume the user synced while the TV was off.
+    private var wokenAt: Date?
 
     var showingDevices = false
     var showingPairing = false
@@ -513,12 +516,16 @@ final class AppModel {
     }
 
     private func finishWake(_ connection: TVConnection) async {
-        let volume = await connection.volumeInfo
+        wokenAt = Date()
         status = .connected
         if let device = state.activeDevice {
             markSeen(device)
         }
-        updateCache(isOn: true, volume: volume)
+        // Do not apply the volume here: a report that arrived during boot may
+        // be a transient (often 6) and would clobber a value the user synced.
+        // Volume reports are handled by `handle(.volume)`, which keeps a synced
+        // estimate during the wake window.
+        updateCache(isOn: true, volume: nil)
     }
 
     /// Shown when a powered-off TV could not be reached or woken.
@@ -538,6 +545,7 @@ final class AppModel {
             updateCache(isOn: isOn, volume: nil)
 
         case .power(let isOn):
+            if !isOn { wokenAt = nil }
             updateCache(isOn: isOn, volume: nil)
 
         case .volume(let level, let max, let muted):
@@ -546,6 +554,13 @@ final class AppModel {
             // (the TV's own audio pipeline, an AVR, or CEC). Caching that would
             // display a bogus "Volume 0".
             guard max > 0 else { return }
+            // Right after waking, the TV sometimes reports a transient level
+            // (often 6) that does not match what the user synced. Keep the
+            // synced estimate during that window.
+            if state.cache.volumeEstimated == true,
+               let wokenAt, Date().timeIntervalSince(wokenAt) < 15 {
+                return
+            }
             mutateState { state in
                 state.cache.volume = level
                 state.cache.volumeMax = max
