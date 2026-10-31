@@ -21,6 +21,9 @@ public actor TVConnection {
     private var connectTask: Task<Void, Error>?
     private var generation = 0
     private var ready = false
+    /// Set when the user asked the TV to power off. The TV then closes the
+    /// socket, and that drop must not surface as an error.
+    private var poweringOff = false
 
     public private(set) var deviceInfo = RemoteDeviceInfo()
     public private(set) var isOn = false
@@ -51,11 +54,18 @@ public actor TVConnection {
         guard let frame else { throw TVConnectionError.notPaired }
         log("-> key \(key.rawValue) code=\(key.keyCode)")
 
+        // The TV closes the remote session as part of shutting down. Record the
+        // intent before sending so the read loop can classify the drop.
+        if key == .power, isOn {
+            poweringOff = true
+        }
+
         do {
             try await frame.send(RemoteMessage.keyInject(key.keyCode))
         } catch {
             // One reconnect attempt: TVs drop idle sessions fairly often, and a
             // key press should not fail just because the session went stale.
+            poweringOff = false
             disconnectInternal()
             try await ensureReady()
             guard let retryFrame = self.frame else { throw TVConnectionError.closed }
@@ -230,7 +240,10 @@ public actor TVConnection {
         ready = false
         frame?.close()
         frame = nil
-        onEvent?(.disconnected(error.localizedDescription))
+        // A TV that is off has no session to keep: a dropped socket is normal,
+        // not something to report to the user.
+        let expected = poweringOff || !isOn
+        onEvent?(.disconnected(expected ? nil : error.localizedDescription))
     }
 
     private func disconnectInternal() {
@@ -240,6 +253,7 @@ public actor TVConnection {
         frame?.close()
         frame = nil
         ready = false
+        poweringOff = false
     }
 
     // MARK: - Debug logging

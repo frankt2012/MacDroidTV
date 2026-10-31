@@ -119,7 +119,8 @@ final class AppModel {
     var statusText: String {
         switch status {
         case .idle:
-            return isPaired ? "Not connected" : "Not paired"
+            guard isPaired else { return "Not paired" }
+            return state.cache.isOn ? "Not connected" : "Standby"
         case .connecting:
             return "Connecting…"
         case .connected:
@@ -408,9 +409,13 @@ final class AppModel {
         case .disconnected(let message):
             connection = nil
             connectionDeviceID = nil
-            status = message.map { .failed($0) } ?? .idle
-            if let message {
+            // A TV that just powered off drops the socket. That is expected, so
+            // do not turn it into an error banner.
+            if let message, state.cache.isOn {
+                status = .failed(message)
                 lastError = message
+            } else {
+                status = .idle
             }
         }
     }
