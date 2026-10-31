@@ -32,6 +32,8 @@
 	<dict>
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.widgetkit-extension</string>
+		<key>NSExtensionPrincipalClass</key>
+		<string>TVRemoteWidgetBundle</string>
 	</dict>
 </dict>
 </plist>

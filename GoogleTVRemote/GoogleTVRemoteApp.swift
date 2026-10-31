@@ -1,12 +1,24 @@
 import Foundation
 import SwiftUI
 import TVRemoteKit
+import WidgetKit
 
 @main
 struct GoogleTVRemoteApp: App {
     @State private var model: AppModel
 
     init() {
+        if CommandLine.arguments.contains("--touch-state") {
+            let store = SharedStore.shared
+            store.update { state in
+                if let v = state.cache.volume { state.cache.volume = v + 1 }
+                state.cache.updatedAt = Date()
+            }
+            WidgetCenter.shared.reloadAllTimelines()
+            print("touched")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 8) { exit(0) }
+            // Fall through to normal init so the app can run briefly.
+        }
         // Developer escape hatches for checking shared storage from Terminal.
         // Run the app binary directly, e.g.
         //   GoogleTVRemote.app/Contents/MacOS/GoogleTVRemote --diagnose

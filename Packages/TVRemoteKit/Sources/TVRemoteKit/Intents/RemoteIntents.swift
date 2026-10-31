@@ -221,6 +221,7 @@ public struct RemoteKeyIntent: AppIntent {
     }
 
     public func perform() async throws -> some IntentResult {
+        SharedStore.shared.appendDebugLog("[widget-intent] perform key=\(key)")
         guard let remoteKey = RemoteKey(rawValue: key) else { return .result() }
         try? await WidgetRemote.shared.send(remoteKey)
         return .result()
