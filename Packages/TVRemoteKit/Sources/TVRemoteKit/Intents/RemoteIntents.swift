@@ -19,8 +19,21 @@ public actor WidgetRemote {
             throw TVConnectionError.notPaired
         }
 
+        let wasOff = !state.cache.isOn
+        var sentWakePacket = false
+        if key == .power, wasOff, let mac = device.wakeMAC, !mac.isEmpty {
+            sentWakePacket = WakeOnLAN.send(mac: mac) > 0
+        }
+
         let connection = try await connection(for: device, identity: identity)
-        try await connection.sendKey(key)
+
+        if key == .power, wasOff,
+           await connection.waitUntilOn(timeout: sentWakePacket ? 6 : 0) {
+            // The TV woke from the magic packet (or was already on). A power
+            // key now would toggle it straight back into standby.
+        } else {
+            try await connection.sendKey(key)
+        }
 
         if key == .volumeUp || key == .volumeDown || key == .mute {
             // The TV reports the new level asynchronously; give that message a

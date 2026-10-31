@@ -403,8 +403,10 @@ final class AppModel {
         // Some TVs keep a Wake-on-LAN capable network chip alive in standby.
         // Fire the magic packet first so the network can come up while we
         // connect; if the TV does not support it the attempt simply fails.
+        var sentWakePacket = false
         if key == .power, wasOff, let mac = wakeMAC, !mac.isEmpty {
             let sent = WakeOnLAN.send(mac: mac)
+            sentWakePacket = sent > 0
             #if DEBUG
             SharedStore.shared.appendDebugLog(
                 "[\(ISO8601DateFormatter().string(from: Date()))] wake mac=\(mac) sent=\(sent)"
@@ -426,6 +428,18 @@ final class AppModel {
         }
 
         do {
+            // A TV that woke from the magic packet (or was already on while the
+            // cache still said otherwise) must not receive the power key: it
+            // would toggle the TV straight back into standby. Give a wake a
+            // moment to announce itself first.
+            if key == .power, wasOff,
+               await connection.waitUntilOn(timeout: sentWakePacket ? 6 : 0) {
+                let volume = await connection.volumeInfo
+                status = .connected
+                updateCache(isOn: true, volume: volume)
+                return
+            }
+
             try await connection.sendKey(key, connectTimeout: connectTimeout)
             let isOn = await connection.isOn
             let volume = await connection.volumeInfo
@@ -446,9 +460,9 @@ final class AppModel {
     /// Shown when a powered-off TV could not be reached or woken.
     private var wakeFailureMessage: String {
         if wakeMAC == nil {
-            return "The TV is off and not on the network. Turn it on with its remote, or enable Quick Start (networked standby) on the TV so the app can wake it."
+            return "The TV is off and not on the network. Turn it on with its remote, or enable the TV's always-on/networked standby setting so the app can reach it."
         }
-        return "The TV is off and did not answer Wake-on-LAN. This model drops off the network in standby, so it has to be turned on with its remote."
+        return "The TV is off and did not answer Wake-on-LAN. Check that the TV's always-on/networked standby setting is enabled and that the MAC address is correct."
     }
 
     private func handle(_ event: TVEvent, deviceID: UUID) {

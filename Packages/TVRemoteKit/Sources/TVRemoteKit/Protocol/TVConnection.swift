@@ -94,6 +94,20 @@ public actor TVConnection {
         try await frame.send(RemoteMessage.appLink(link))
     }
 
+    /// Waits until the TV reports itself on, or the timeout elapses.
+    ///
+    /// A Wake-on-LAN packet wakes the TV asynchronously: the handshake can
+    /// finish while the TV is still starting, and the power key would then
+    /// toggle it straight back into standby. Waiting for the TV to announce
+    /// itself avoids that.
+    public func waitUntilOn(timeout: TimeInterval) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !isOn, Date() < deadline {
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+        return isOn
+    }
+
     /// Re-runs the handshake and returns the TV's current power state.
     @discardableResult
     public func refresh() async throws -> Bool {

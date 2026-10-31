@@ -169,15 +169,15 @@ estimate.
   be read. The app ignores that 0/0 report and falls back to a local estimate
   that moves with the volume keys; it is labelled `≈` and `estimated` in the UI.
   TVs that do report a real scale show the exact level instead.
-- **A TV that leaves the network in standby cannot be woken remotely.** The TCL
-  used for development drops its Wi-Fi/Ethernet, mDNS advertisement and the
-  remote service (port 6466) as soon as it powers off, even with Quick Start
-  enabled, and it does not answer Wake-on-LAN magic packets. In that state the
-  power button can only report that the TV is unreachable. TVs that keep
-  networked standby alive (and answer port 6466 while off) wake normally. A
-  Wake-on-LAN MAC can be set per device in the Devices sheet for sets whose
-  network chip stays powered; the power button then sends a magic packet before
-  connecting.
+- **Powering on a TV in standby depends on the TV keeping its network alive.**
+  With Ethernet and the TV's "always connected"/networked standby setting on,
+  the TCL used for development stays reachable (mDNS, port 6466) while off, so
+  the app can wake it. The power button sends a Wake-on-LAN magic packet (MAC
+  set per device in the Devices sheet) and waits for the TV to announce itself;
+  if it does, no power key is sent, because that key would toggle the TV
+  straight back into standby. When WoL is not available or does not work, the
+  power key itself wakes the TV. A TV that drops off the network entirely in
+  standby can only be switched on with its own remote.
 - The widget's App Intent buttons require macOS 14+ and a signed build; they do
   not work in Xcode Previews.
 - This is a personal-use project, not an App Store submission. Hardened runtime
