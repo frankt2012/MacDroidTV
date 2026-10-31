@@ -125,6 +125,8 @@ APP="$HOME/Applications/GoogleTVRemote.app/Contents/MacOS/GoogleTVRemote"
 "$APP" --write-test    # writes and reads back a marker, then restores state
 "$APP" --reset-state   # deletes the shared state file
 "$APP" --volume-probe  # sends volume up/down/mute and logs every protocol frame
+"$APP" --discover      # browses Bonjour for TVs and prints their addresses
+"$APP" --wol-test MAC  # sends a Wake-on-LAN magic packet to a MAC
 open -a "$HOME/Applications/GoogleTVRemote.app" \
   --args --key-test volumeUp volumeDown  # sends keys through the app itself
 ```
@@ -167,6 +169,15 @@ estimate.
   be read. The app ignores that 0/0 report and falls back to a local estimate
   that moves with the volume keys; it is labelled `≈` and `estimated` in the UI.
   TVs that do report a real scale show the exact level instead.
+- **A TV that leaves the network in standby cannot be woken remotely.** The TCL
+  used for development drops its Wi-Fi/Ethernet, mDNS advertisement and the
+  remote service (port 6466) as soon as it powers off, even with Quick Start
+  enabled, and it does not answer Wake-on-LAN magic packets. In that state the
+  power button can only report that the TV is unreachable. TVs that keep
+  networked standby alive (and answer port 6466 while off) wake normally. A
+  Wake-on-LAN MAC can be set per device in the Devices sheet for sets whose
+  network chip stays powered; the power button then sends a magic packet before
+  connecting.
 - The widget's App Intent buttons require macOS 14+ and a signed build; they do
   not work in Xcode Previews.
 - This is a personal-use project, not an App Store submission. Hardened runtime

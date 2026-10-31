@@ -6,6 +6,7 @@ struct DevicesView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var clientName = ""
+    @State private var wakeMAC = ""
     @State private var showResetConfirmation = false
 
     var body: some View {
@@ -42,6 +43,7 @@ struct DevicesView: View {
         .frame(width: 480, height: 540)
         .onAppear {
             clientName = model.state.clientName
+            wakeMAC = model.wakeMAC ?? ""
         }
         .sheet(isPresented: $model.showingPairing, onDismiss: {
             model.cancelPairing()
@@ -165,6 +167,25 @@ struct DevicesView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            HStack(spacing: 8) {
+                Text("Wake-on-LAN MAC")
+                TextField("AA:BB:CC:DD:EE:FF", text: $wakeMAC)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit { model.setWakeMAC(wakeMAC) }
+                Button("Save") {
+                    model.setWakeMAC(wakeMAC)
+                }
+                .disabled(
+                    wakeMAC.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+                        == (model.wakeMAC ?? "")
+                )
+            }
+
+            Text("Optional. Only helps if the TV keeps its network alive in standby; the power button then sends a magic packet before connecting.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
             HStack {
                 Text("Pairing identity")

@@ -10,6 +10,9 @@ public struct PairedDevice: Codable, Identifiable, Equatable, Sendable {
     /// for a future pinning check; the protocol itself does not require it.
     public var serverCertificate: Data?
     public var lastSeen: Date?
+    /// Network adapter address used for a Wake-on-LAN magic packet. Only some
+    /// TVs keep their network alive in standby, so this is optional.
+    public var wakeMAC: String?
 
     public init(
         id: UUID = UUID(),
@@ -17,7 +20,8 @@ public struct PairedDevice: Codable, Identifiable, Equatable, Sendable {
         host: String,
         port: UInt16 = 6466,
         serverCertificate: Data? = nil,
-        lastSeen: Date? = nil
+        lastSeen: Date? = nil,
+        wakeMAC: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -25,6 +29,7 @@ public struct PairedDevice: Codable, Identifiable, Equatable, Sendable {
         self.port = port
         self.serverCertificate = serverCertificate
         self.lastSeen = lastSeen
+        self.wakeMAC = wakeMAC
     }
 }
 
@@ -122,13 +127,22 @@ public struct DiscoveredDevice: Identifiable, Equatable, Sendable {
     public let serviceName: String
     public let name: String
     public var host: String?
+    /// Raw Bonjour TXT record. Android TV advertises `bt` (Bluetooth address)
+    /// and `rs`, which are handy when diagnosing wake support.
+    public let txt: [String: String]
 
     public var id: String { serviceName }
 
-    public init(serviceName: String, name: String, host: String? = nil) {
+    public init(
+        serviceName: String,
+        name: String,
+        host: String? = nil,
+        txt: [String: String] = [:]
+    ) {
         self.serviceName = serviceName
         self.name = name
         self.host = host
+        self.txt = txt
     }
 }
 

@@ -107,16 +107,21 @@ public final class TVDiscovery: @unchecked Sendable {
             newEndpoints[serviceName] = result.endpoint
 
             var displayName = serviceName
-            if case let .bonjour(txt) = result.metadata,
-               let advertisedName = txt["name"],
-               !advertisedName.isEmpty {
-                displayName = advertisedName
+            var txt: [String: String] = [:]
+            if case let .bonjour(metadata) = result.metadata {
+                for (key, value) in metadata.dictionary {
+                    txt[key] = value
+                }
+                if let advertisedName = metadata["name"], !advertisedName.isEmpty {
+                    displayName = advertisedName
+                }
             }
 
             newDevices[serviceName] = DiscoveredDevice(
                 serviceName: serviceName,
                 name: displayName,
-                host: devices[serviceName]?.host
+                host: devices[serviceName]?.host,
+                txt: txt
             )
         }
 

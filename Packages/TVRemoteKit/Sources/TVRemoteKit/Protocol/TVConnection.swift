@@ -24,6 +24,9 @@ public actor TVConnection {
     /// Set when the user asked the TV to power off. The TV then closes the
     /// socket, and that drop must not surface as an error.
     private var poweringOff = false
+    /// When the last frame arrived. A socket to a sleeping TV can stay open and
+    /// silently swallow writes, so this tells us when to start a fresh one.
+    private var lastFrameAt = Date.distantPast
 
     public private(set) var deviceInfo = RemoteDeviceInfo()
     public private(set) var isOn = false
@@ -41,16 +44,23 @@ public actor TVConnection {
         self.debugLog = debugLog
     }
 
-    public func connect() async throws {
-        try await ensureReady()
+    public func connect(timeout: TimeInterval = 10) async throws {
+        try await ensureReady(timeout: timeout)
     }
 
     public func disconnect() {
         disconnectInternal()
     }
 
-    public func sendKey(_ key: RemoteKey) async throws {
-        try await ensureReady()
+    public func sendKey(_ key: RemoteKey, connectTimeout: TimeInterval = 10) async throws {
+        // A TV that reported itself off may still hold a half-open socket that
+        // accepts writes and drops them. When waking it, always start from a
+        // fresh connection unless the handshake just completed.
+        if key == .power, !isOn, Date().timeIntervalSince(lastFrameAt) > 5 {
+            disconnectInternal()
+        }
+
+        try await ensureReady(timeout: connectTimeout)
         guard let frame else { throw TVConnectionError.notPaired }
         log("-> key \(key.rawValue) code=\(key.keyCode)")
 
@@ -67,7 +77,7 @@ public actor TVConnection {
             // key press should not fail just because the session went stale.
             poweringOff = false
             disconnectInternal()
-            try await ensureReady()
+            try await ensureReady(timeout: connectTimeout)
             guard let retryFrame = self.frame else { throw TVConnectionError.closed }
             try await retryFrame.send(RemoteMessage.keyInject(key.keyCode))
         }
@@ -94,7 +104,7 @@ public actor TVConnection {
 
     // MARK: - Private
 
-    private func ensureReady() async throws {
+    private func ensureReady(timeout: TimeInterval = 10) async throws {
         if ready, frame != nil {
             return
         }
@@ -104,7 +114,7 @@ public actor TVConnection {
             return
         }
 
-        let task = Task { try await self.performConnect() }
+        let task = Task { try await self.performConnect(timeout: timeout) }
         connectTask = task
         do {
             try await task.value
@@ -115,7 +125,7 @@ public actor TVConnection {
         }
     }
 
-    private func performConnect() async throws {
+    private func performConnect(timeout: TimeInterval = 10) async throws {
         disconnectInternal()
         log("connect host=\(device.host):\(device.port)")
 
@@ -134,10 +144,11 @@ public actor TVConnection {
         frame = newFrame
 
         do {
-            try await newFrame.connect()
+            try await newFrame.connect(timeout: timeout)
 
             while true {
                 let data = try await newFrame.receive(timeout: 10)
+                lastFrameAt = Date()
                 let message = try RemoteMessage.decode(data)
                 if let text = Self.describe(message) {
                     log("<- \(text) raw=\(Self.hex(data))")
@@ -197,6 +208,7 @@ public actor TVConnection {
             while !Task.isCancelled {
                 do {
                     let data = try await frame.receive(timeout: 120)
+                    await self.noteFrame()
                     let message = try RemoteMessage.decode(data)
                     if let text = Self.describe(message) {
                         self.log("<- \(text) raw=\(Self.hex(data))")
@@ -226,6 +238,11 @@ public actor TVConnection {
         case .remoteStart(let started):
             isOn = started
             onEvent?(.power(started))
+            if !started, poweringOff {
+                // We asked for the shutdown and the TV has acknowledged it, so
+                // there is nothing left to keep open.
+                disconnectInternal()
+            }
 
         case .error:
             onEvent?(.disconnected("The TV reported an error."))
@@ -233,6 +250,10 @@ public actor TVConnection {
         default:
             break
         }
+    }
+
+    private func noteFrame() {
+        lastFrameAt = Date()
     }
 
     private func handleDisconnect(_ error: Error, generation: Int) {

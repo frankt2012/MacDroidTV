@@ -116,3 +116,25 @@ final class ModelTests: XCTestCase {
         XCTAssertEqual(cache2.volumeStep, 3)
     }
 }
+
+final class WakeOnLANTests: XCTestCase {
+    func testMagicPacketShape() {
+        let packet = WakeOnLAN.magicPacket(for: "f4:4d:ad:05:75:d7")
+        XCTAssertEqual(packet?.count, 6 + 16 * 6)
+        XCTAssertEqual(packet?.prefix(6), Data(repeating: 0xFF, count: 6))
+        let mac = Data([0xF4, 0x4D, 0xAD, 0x05, 0x75, 0xD7])
+        XCTAssertEqual(packet?.suffix(6), mac)
+    }
+
+    func testMACNormalisation() {
+        XCTAssertEqual(
+            WakeOnLAN.macBytes("F4-4D-AD-05-75-D7"),
+            [0xF4, 0x4D, 0xAD, 0x05, 0x75, 0xD7]
+        )
+        XCTAssertEqual(
+            WakeOnLAN.macBytes("f44dad0575d7"),
+            [0xF4, 0x4D, 0xAD, 0x05, 0x75, 0xD7]
+        )
+        XCTAssertNil(WakeOnLAN.magicPacket(for: "not-a-mac"))
+    }
+}

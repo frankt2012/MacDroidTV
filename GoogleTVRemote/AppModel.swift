@@ -101,6 +101,19 @@ final class AppModel {
     }
 
     var isVolumeEstimated: Bool { state.cache.volumeEstimated == true }
+    var wakeMAC: String? { state.activeDevice?.wakeMAC }
+
+    func setWakeMAC(_ value: String) {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalised = trimmed.isEmpty ? nil : trimmed.uppercased()
+        guard let device = state.activeDevice else { return }
+        mutateState { state in
+            if let index = state.devices.firstIndex(where: { $0.id == device.id }) {
+                state.devices[index].wakeMAC = normalised
+            }
+        }
+    }
+
     var volumeScaleMax: Int {
         let maxVolume = state.cache.volumeMax ?? 0
         return maxVolume > 0 ? maxVolume : VolumeEstimate.defaultMax
@@ -155,7 +168,11 @@ final class AppModel {
         await connect(to: device)
     }
 
-    func connect(to device: PairedDevice) async {
+    func connect(
+        to device: PairedDevice,
+        timeout: TimeInterval = 10,
+        discoveryTimeout: TimeInterval = 5
+    ) async {
         guard let identity = state.identity else {
             status = .idle
             return
@@ -180,16 +197,28 @@ final class AppModel {
 
         var connected = false
         do {
-            try await establishConnection(to: device, host: device.host, identity: identity)
+            try await establishConnection(
+                to: device,
+                host: device.host,
+                identity: identity,
+                timeout: timeout
+            )
             connected = true
         } catch {
             // A saved host can go stale when the TV's DHCP lease or link-local
             // address changes. Only ask Bonjour after the saved host fails:
             // resolving first opens an extra connection, which can race the
-            // TV's single-session handling.
-            if let resolved = await resolvedHost(for: device), resolved != device.host {
+            // TV's single-session handling. A TV that is off cannot answer
+            // Bonjour either, so skip the extra wait when waking it.
+            if let resolved = await resolvedHost(for: device, timeout: discoveryTimeout),
+               resolved != device.host {
                 do {
-                    try await establishConnection(to: device, host: resolved, identity: identity)
+                    try await establishConnection(
+                        to: device,
+                        host: resolved,
+                        identity: identity,
+                        timeout: timeout
+                    )
                     connected = true
                     mutateState { state in
                         if let index = state.devices.firstIndex(where: { $0.id == device.id }) {
@@ -218,7 +247,8 @@ final class AppModel {
     private func establishConnection(
         to device: PairedDevice,
         host: String,
-        identity: StoredIdentity
+        identity: StoredIdentity,
+        timeout: TimeInterval = 10
     ) async throws {
         var target = device
         target.host = host
@@ -241,7 +271,7 @@ final class AppModel {
         connectionDeviceID = device.id
 
         do {
-            try await newConnection.connect()
+            try await newConnection.connect(timeout: timeout)
             let isOn = await newConnection.isOn
             let volume = await newConnection.volumeInfo
             status = .connected
@@ -309,14 +339,17 @@ final class AppModel {
         }
     }
 
-    private func ensureConnection() async -> TVConnection? {
+    private func ensureConnection(
+        timeout: TimeInterval = 10,
+        discoveryTimeout: TimeInterval = 5
+    ) async -> TVConnection? {
         if let connection,
            connectionDeviceID == state.activeDevice?.id,
            case .connected = status {
             return connection
         }
         guard let device = state.activeDevice else { return nil }
-        await connect(to: device)
+        await connect(to: device, timeout: timeout, discoveryTimeout: discoveryTimeout)
         if case .connected = status {
             return connection
         }
@@ -324,13 +357,13 @@ final class AppModel {
     }
 
     /// Current Bonjour address for a paired TV, if it is currently discoverable.
-    private func resolvedHost(for device: PairedDevice) async -> String? {
+    private func resolvedHost(for device: PairedDevice, timeout: TimeInterval = 5) async -> String? {
         guard let discoveredDevice = discovered.first(where: {
             $0.name == device.name || $0.serviceName == device.name
         }) else {
             return nil
         }
-        return await discovery.resolveHost(for: discoveredDevice.serviceName)
+        return await discovery.resolveHost(for: discoveredDevice.serviceName, timeout: timeout)
     }
 
     #if DEBUG
@@ -362,11 +395,30 @@ final class AppModel {
 
     private func performSend(_ key: RemoteKey) async {
         let wasOff = !state.cache.isOn
-        guard let connection = await ensureConnection() else {
+        // A sleeping TV should fail fast: waiting ten seconds per attempt to
+        // report that a wake did not work feels broken.
+        let connectTimeout: TimeInterval = wasOff ? 5 : 10
+        let discoveryTimeout: TimeInterval = wasOff ? 2 : 5
+
+        // Some TVs keep a Wake-on-LAN capable network chip alive in standby.
+        // Fire the magic packet first so the network can come up while we
+        // connect; if the TV does not support it the attempt simply fails.
+        if key == .power, wasOff, let mac = wakeMAC, !mac.isEmpty {
+            let sent = WakeOnLAN.send(mac: mac)
+            #if DEBUG
+            SharedStore.shared.appendDebugLog(
+                "[\(ISO8601DateFormatter().string(from: Date()))] wake mac=\(mac) sent=\(sent)"
+            )
+            #endif
+        }
+        guard let connection = await ensureConnection(
+            timeout: connectTimeout,
+            discoveryTimeout: discoveryTimeout
+        ) else {
             if key == .power, wasOff {
                 // The TV dropped off the network while off, so there is nothing
                 // to connect to. Explain that instead of leaving a bare timeout.
-                let message = "The TV is off and not reachable on the network. Turn it on with its remote, or enable Quick Start (networked standby) on the TV so it can be woken remotely."
+                let message = wakeFailureMessage
                 lastError = message
                 status = .failed(message)
             }
@@ -374,7 +426,7 @@ final class AppModel {
         }
 
         do {
-            try await connection.sendKey(key)
+            try await connection.sendKey(key, connectTimeout: connectTimeout)
             let isOn = await connection.isOn
             let volume = await connection.volumeInfo
             let hasVolumeFeedback = (volume?.max ?? 0) > 0
@@ -389,6 +441,14 @@ final class AppModel {
             self.connection = nil
             connectionDeviceID = nil
         }
+    }
+
+    /// Shown when a powered-off TV could not be reached or woken.
+    private var wakeFailureMessage: String {
+        if wakeMAC == nil {
+            return "The TV is off and not on the network. Turn it on with its remote, or enable Quick Start (networked standby) on the TV so the app can wake it."
+        }
+        return "The TV is off and did not answer Wake-on-LAN. This model drops off the network in standby, so it has to be turned on with its remote."
     }
 
     private func handle(_ event: TVEvent, deviceID: UUID) {
