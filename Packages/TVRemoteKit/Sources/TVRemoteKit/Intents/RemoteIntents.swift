@@ -25,7 +25,25 @@ public actor WidgetRemote {
             sentWakePacket = WakeOnLAN.send(mac: mac) > 0
         }
 
-        let connection = try await connection(for: device, identity: identity)
+        // The TV's network stack needs a moment to come back after the packet.
+        if sentWakePacket {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+        }
+
+        var connection = try? await openConnection(
+            for: device,
+            identity: identity,
+            timeout: sentWakePacket ? 3 : 10
+        )
+        if connection == nil, sentWakePacket {
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            connection = try? await openConnection(
+                for: device,
+                identity: identity,
+                timeout: 3
+            )
+        }
+        guard let connection else { throw TVConnectionError.closed }
 
         if key == .power, wasOff,
            await connection.waitUntilOn(timeout: sentWakePacket ? 6 : 0) {
@@ -78,7 +96,7 @@ public actor WidgetRemote {
             return
         }
 
-        let connection = try await connection(for: device, identity: identity)
+        let connection = try await openConnection(for: device, identity: identity)
         let isOn = try await connection.refresh()
         let volumeInfo = await connection.volumeInfo
 
@@ -95,11 +113,16 @@ public actor WidgetRemote {
         WidgetCenter.shared.reloadAllTimelines()
     }
 
-    private func connection(for device: PairedDevice, identity: StoredIdentity) async throws -> TVConnection {
+    private func openConnection(
+        for device: PairedDevice,
+        identity: StoredIdentity,
+        timeout: TimeInterval = 10
+    ) async throws -> TVConnection {
         if let connection,
            connectionDeviceID == device.id,
            let connectionOpened,
-           Date().timeIntervalSince(connectionOpened) < 20 {
+           Date().timeIntervalSince(connectionOpened) < 20,
+           await connection.isReady {
             return connection
         }
 
@@ -108,7 +131,7 @@ public actor WidgetRemote {
         }
 
         let newConnection = TVConnection(device: device, identity: identity)
-        try await newConnection.connect()
+        try await newConnection.connect(timeout: timeout)
 
         connection = newConnection
         connectionDeviceID = device.id

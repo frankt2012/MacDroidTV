@@ -27,6 +27,9 @@ public actor TVConnection {
     /// When the last frame arrived. A socket to a sleeping TV can stay open and
     /// silently swallow writes, so this tells us when to start a fresh one.
     private var lastFrameAt = Date.distantPast
+    /// When the TV last announced that it is on. The optimistic toggle after a
+    /// power key does not count, so this can confirm the TV actually woke.
+    private var lastOnAnnouncement = Date.distantPast
 
     public private(set) var deviceInfo = RemoteDeviceInfo()
     public private(set) var isOn = false
@@ -51,6 +54,11 @@ public actor TVConnection {
     public func disconnect() {
         disconnectInternal()
     }
+
+    /// Whether the handshake completed and the socket is still open. A TV that
+    /// powered off closes the session on its side, and the app must not keep
+    /// using the dead connection.
+    public var isReady: Bool { ready && frame != nil }
 
     public func sendKey(_ key: RemoteKey, connectTimeout: TimeInterval = 10) async throws {
         // A TV that reported itself off may still hold a half-open socket that
@@ -106,6 +114,17 @@ public actor TVConnection {
             try? await Task.sleep(nanoseconds: 100_000_000)
         }
         return isOn
+    }
+
+    /// Waits for the TV itself to announce that it is on. Unlike `isOn`, this
+    /// is not satisfied by the optimistic toggle after sending a power key, so
+    /// it can confirm that a wake key actually worked.
+    public func waitForWake(after start: Date, timeout: TimeInterval) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while lastOnAnnouncement < start, Date() < deadline {
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+        return lastOnAnnouncement >= start
     }
 
     /// Re-runs the handshake and returns the TV's current power state.
@@ -181,6 +200,7 @@ public actor TVConnection {
 
                 case .remoteStart(let started):
                     isOn = started
+                    if started { lastOnAnnouncement = Date() }
                     ready = true
                     onEvent?(.connected(device: deviceInfo, isOn: started))
                     startReadLoop(for: newFrame)
@@ -251,11 +271,16 @@ public actor TVConnection {
 
         case .remoteStart(let started):
             isOn = started
+            if started { lastOnAnnouncement = Date() }
             onEvent?(.power(started))
             if !started, poweringOff {
                 // We asked for the shutdown and the TV has acknowledged it, so
                 // there is nothing left to keep open.
                 disconnectInternal()
+                // Tell the app to drop this connection: the socket is gone, so
+                // the next power press must open a fresh one instead of waiting
+                // on a dead session.
+                onEvent?(.disconnected(nil))
             }
 
         case .error:

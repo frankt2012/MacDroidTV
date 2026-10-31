@@ -99,7 +99,7 @@ struct RemotePanelView: View {
                     .foregroundStyle(model.isOn ? Color.red : Color.secondary)
             }
             .buttonStyle(.plain)
-            .disabled(!model.isPaired)
+            .disabled(!model.isPaired || model.isWaking)
             .help("Power")
         }
     }

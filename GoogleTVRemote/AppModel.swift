@@ -29,6 +29,9 @@ final class AppModel {
     private(set) var pairingError: String?
     private(set) var lastError: String?
     private(set) var isRefreshing = false
+    /// True while a sleeping TV is being woken, so extra power presses cannot
+    /// toggle it back off mid-wake.
+    private(set) var isWaking = false
 
     var showingDevices = false
     var showingPairing = false
@@ -135,7 +138,7 @@ final class AppModel {
             guard isPaired else { return "Not paired" }
             return state.cache.isOn ? "Not connected" : "Standby"
         case .connecting:
-            return "Connecting…"
+            return isWaking ? "Waking TV…" : "Connecting…"
         case .connected:
             return isOn ? "Connected · On" : "Connected · Standby"
         case .failed(let message):
@@ -171,14 +174,16 @@ final class AppModel {
     func connect(
         to device: PairedDevice,
         timeout: TimeInterval = 10,
-        discoveryTimeout: TimeInterval = 5
+        discoveryTimeout: TimeInterval = 5,
+        reportFailure: Bool = true
     ) async {
         guard let identity = state.identity else {
             status = .idle
             return
         }
 
-        if connectionDeviceID == device.id, case .connected = status, connection != nil {
+        if let connection, connectionDeviceID == device.id, case .connected = status,
+           await connection.isReady {
             return
         }
         if connectingDeviceID == device.id {
@@ -226,10 +231,10 @@ final class AppModel {
                         }
                     }
                 } catch {
-                    reportConnectFailure(error)
+                    if reportFailure { reportConnectFailure(error) }
                 }
             } else {
-                reportConnectFailure(error)
+                if reportFailure { reportConnectFailure(error) }
             }
         }
 
@@ -306,6 +311,9 @@ final class AppModel {
     }
 
     func send(_ key: RemoteKey) {
+        // A wake is in progress: another power press would toggle the TV back
+        // off the moment it comes up.
+        if key == .power, isWaking { return }
         Task { [weak self] in
             await self?.performSend(key)
         }
@@ -341,15 +349,22 @@ final class AppModel {
 
     private func ensureConnection(
         timeout: TimeInterval = 10,
-        discoveryTimeout: TimeInterval = 5
+        discoveryTimeout: TimeInterval = 5,
+        reportFailure: Bool = true
     ) async -> TVConnection? {
         if let connection,
            connectionDeviceID == state.activeDevice?.id,
-           case .connected = status {
+           case .connected = status,
+           await connection.isReady {
             return connection
         }
         guard let device = state.activeDevice else { return nil }
-        await connect(to: device, timeout: timeout, discoveryTimeout: discoveryTimeout)
+        await connect(
+            to: device,
+            timeout: timeout,
+            discoveryTimeout: discoveryTimeout,
+            reportFailure: reportFailure
+        )
         if case .connected = status {
             return connection
         }
@@ -394,52 +409,27 @@ final class AppModel {
     #endif
 
     private func performSend(_ key: RemoteKey) async {
+        // Waking a sleeping TV has its own flow: a power key sent while it is
+        // still starting would put it straight back into standby.
+        if key == .power, !state.cache.isOn {
+            await wake()
+            return
+        }
+
         let wasOff = !state.cache.isOn
         // A sleeping TV should fail fast: waiting ten seconds per attempt to
         // report that a wake did not work feels broken.
         let connectTimeout: TimeInterval = wasOff ? 5 : 10
         let discoveryTimeout: TimeInterval = wasOff ? 2 : 5
 
-        // Some TVs keep a Wake-on-LAN capable network chip alive in standby.
-        // Fire the magic packet first so the network can come up while we
-        // connect; if the TV does not support it the attempt simply fails.
-        var sentWakePacket = false
-        if key == .power, wasOff, let mac = wakeMAC, !mac.isEmpty {
-            let sent = WakeOnLAN.send(mac: mac)
-            sentWakePacket = sent > 0
-            #if DEBUG
-            SharedStore.shared.appendDebugLog(
-                "[\(ISO8601DateFormatter().string(from: Date()))] wake mac=\(mac) sent=\(sent)"
-            )
-            #endif
-        }
         guard let connection = await ensureConnection(
             timeout: connectTimeout,
             discoveryTimeout: discoveryTimeout
         ) else {
-            if key == .power, wasOff {
-                // The TV dropped off the network while off, so there is nothing
-                // to connect to. Explain that instead of leaving a bare timeout.
-                let message = wakeFailureMessage
-                lastError = message
-                status = .failed(message)
-            }
             return
         }
 
         do {
-            // A TV that woke from the magic packet (or was already on while the
-            // cache still said otherwise) must not receive the power key: it
-            // would toggle the TV straight back into standby. Give a wake a
-            // moment to announce itself first.
-            if key == .power, wasOff,
-               await connection.waitUntilOn(timeout: sentWakePacket ? 6 : 0) {
-                let volume = await connection.volumeInfo
-                status = .connected
-                updateCache(isOn: true, volume: volume)
-                return
-            }
-
             try await connection.sendKey(key, connectTimeout: connectTimeout)
             let isOn = await connection.isOn
             let volume = await connection.volumeInfo
@@ -455,6 +445,80 @@ final class AppModel {
             self.connection = nil
             connectionDeviceID = nil
         }
+    }
+
+    /// Turns a sleeping TV on. Sends a Wake-on-LAN packet, then waits for the
+    /// TV to come back and announce itself. The power key is only used when the
+    /// TV is reachable but the packet did not wake it: a key sent while the TV
+    /// is still starting would put it straight back into standby.
+    private func wake() async {
+        guard !isWaking else { return }
+        isWaking = true
+        defer { isWaking = false }
+
+        var sentWakePacket = false
+        if let mac = wakeMAC, !mac.isEmpty {
+            let sent = WakeOnLAN.send(mac: mac)
+            sentWakePacket = sent > 0
+            #if DEBUG
+            SharedStore.shared.appendDebugLog(
+                "[\(ISO8601DateFormatter().string(from: Date()))] wake mac=\(mac) sent=\(sent)"
+            )
+            #endif
+        }
+
+        // The TV's network stack needs a moment to come back after the packet;
+        // connecting too early just burns a timeout.
+        if sentWakePacket {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+        }
+
+        let deadline = Date().addingTimeInterval(12)
+        var reachableAt: Date?
+        var sentPowerKey = false
+
+        while Date() < deadline {
+            if let connection = await ensureConnection(
+                timeout: 2,
+                discoveryTimeout: 1,
+                reportFailure: false
+            ) {
+                if reachableAt == nil { reachableAt = Date() }
+
+                if await connection.waitUntilOn(timeout: 2) {
+                    await finishWake(connection)
+                    return
+                }
+
+                // The TV is reachable but still asleep, so the magic packet did
+                // not wake it. Wait a bit first: the power key would otherwise
+                // interrupt a TV that is still starting up.
+                if !sentPowerKey,
+                   Date().timeIntervalSince(reachableAt ?? Date()) > 4 {
+                    sentPowerKey = true
+                    let keyTime = Date()
+                    try? await connection.sendKey(.power, connectTimeout: 2)
+                    if await connection.waitForWake(after: keyTime, timeout: 6) {
+                        await finishWake(connection)
+                        return
+                    }
+                }
+            }
+            try? await Task.sleep(nanoseconds: 300_000_000)
+        }
+
+        let message = wakeFailureMessage
+        lastError = message
+        status = .failed(message)
+    }
+
+    private func finishWake(_ connection: TVConnection) async {
+        let volume = await connection.volumeInfo
+        status = .connected
+        if let device = state.activeDevice {
+            markSeen(device)
+        }
+        updateCache(isOn: true, volume: volume)
     }
 
     /// Shown when a powered-off TV could not be reached or woken.
