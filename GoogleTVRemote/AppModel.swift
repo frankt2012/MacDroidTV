@@ -361,7 +361,17 @@ final class AppModel {
     #endif
 
     private func performSend(_ key: RemoteKey) async {
-        guard let connection = await ensureConnection() else { return }
+        let wasOff = !state.cache.isOn
+        guard let connection = await ensureConnection() else {
+            if key == .power, wasOff {
+                // The TV dropped off the network while off, so there is nothing
+                // to connect to. Explain that instead of leaving a bare timeout.
+                let message = "The TV is off and not reachable on the network. Turn it on with its remote, or enable Quick Start (networked standby) on the TV so it can be woken remotely."
+                lastError = message
+                status = .failed(message)
+            }
+            return
+        }
 
         do {
             try await connection.sendKey(key)
