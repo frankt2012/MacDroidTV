@@ -440,7 +440,14 @@ final class AppModel {
 
             updateCache(isOn: isOn, volume: volume) { state in
                 guard !hasVolumeFeedback else { return }
-                VolumeEstimate.apply(key, to: &state.cache)
+                if key == .volumeUp || key == .volumeDown {
+                    VolumeEstimate.apply(key, to: &state.cache)
+                }
+            }
+            // Mute is optimistic: the TV's volume report may lag, so flip the
+            // cached state now and let a later real report correct it.
+            if key == .mute {
+                mutateState { state in state.cache.muted.toggle() }
             }
         } catch {
             lastError = error.localizedDescription
@@ -556,16 +563,20 @@ final class AppModel {
             guard max > 0 else { return }
             // Right after waking, the TV sometimes reports a transient level
             // (often 6) that does not match what the user synced. Keep the
-            // synced estimate during that window.
-            if state.cache.volumeEstimated == true,
-               let wokenAt, Date().timeIntervalSince(wokenAt) < 15 {
-                return
-            }
+            // synced estimate's level during that window, but still take the
+            // TV's mute state.
+            let wakeWindow = state.cache.volumeEstimated == true
+                && wokenAt != nil
+                && Date().timeIntervalSince(wokenAt!) < 15
             mutateState { state in
-                state.cache.volume = level
-                state.cache.volumeMax = max
+                if !wakeWindow {
+                    state.cache.volume = level
+                    state.cache.volumeMax = max
+                    state.cache.volumeEstimated = false
+                } else if (state.cache.volumeMax ?? 0) == 0 {
+                    state.cache.volumeMax = max
+                }
                 state.cache.muted = muted
-                state.cache.volumeEstimated = false
                 state.cache.updatedAt = Date()
             }
 
@@ -591,10 +602,17 @@ final class AppModel {
         mutateState { state in
             state.cache.isOn = isOn
             if let volume, volume.max > 0 {
-                state.cache.volume = volume.level
-                state.cache.volumeMax = volume.max
+                let wakeWindow = state.cache.volumeEstimated == true
+                    && wokenAt != nil
+                    && Date().timeIntervalSince(wokenAt!) < 15
+                if !wakeWindow {
+                    state.cache.volume = volume.level
+                    state.cache.volumeMax = volume.max
+                    state.cache.volumeEstimated = false
+                } else if (state.cache.volumeMax ?? 0) == 0 {
+                    state.cache.volumeMax = volume.max
+                }
                 state.cache.muted = volume.muted
-                state.cache.volumeEstimated = false
             }
             extra?(&state)
             state.cache.updatedAt = Date()
