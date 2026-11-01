@@ -43,9 +43,42 @@ struct RemotePanelView: View {
                 .frame(width: 8, height: 8)
 
             VStack(alignment: .leading, spacing: 1) {
-                Text(model.deviceName)
-                    .font(.headline)
-                    .lineLimit(1)
+                Menu {
+                    if model.state.devices.isEmpty {
+                        Text("No paired TVs")
+                    } else {
+                        ForEach(model.state.devices) { device in
+                            Button {
+                                model.select(device)
+                            } label: {
+                                if device.id == model.activeDevice?.id {
+                                    Label(device.name, systemImage: "checkmark")
+                                } else {
+                                    Text(device.name)
+                                }
+                            }
+                        }
+                    }
+                    Divider()
+                    Button("Manage Devices…") {
+                        model.showingDevices = true
+                    }
+                } label: {
+                    HStack(spacing: 3) {
+                        Text(model.deviceName)
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help("Choose a TV")
+
                 Text(model.statusText)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -54,34 +87,6 @@ struct RemotePanelView: View {
             }
 
             Spacer(minLength: 6)
-
-            Menu {
-                if model.state.devices.isEmpty {
-                    Text("No paired TVs")
-                } else {
-                    ForEach(model.state.devices) { device in
-                        Button {
-                            model.select(device)
-                        } label: {
-                            if device.id == model.activeDevice?.id {
-                                Label(device.name, systemImage: "checkmark")
-                            } else {
-                                Text(device.name)
-                            }
-                        }
-                    }
-                }
-                Divider()
-                Button("Manage Devices…") {
-                    model.showingDevices = true
-                }
-            } label: {
-                Image(systemName: "ellipsis.circle")
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .help("Choose a TV")
 
             Button {
                 model.togglePower()
