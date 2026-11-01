@@ -15,3 +15,6 @@ GoogleTVRemote.xcodeproj/
 
 # Release build output
 build_release*/
+
+# Distribution images
+*.dmg

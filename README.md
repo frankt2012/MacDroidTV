@@ -2,6 +2,11 @@
 
 A native SwiftUI menu bar app and interactive desktop widget for Google TV / Android TV.
 
+> **AI-built:** This project was developed with substantial AI assistance — the
+> code, UI, tests, and documentation were produced with DeepSeek V4.1 Flash
+> running in OpenCode. Review the code before relying on it for anything
+> sensitive.
+
 - Menu bar popover with a full remote: D-pad, OK, back, home, menu, TV, settings,
   volume, mute, power, and media transport keys.
 - Small and medium widgets with a working D-pad, volume, mute, power, and live
