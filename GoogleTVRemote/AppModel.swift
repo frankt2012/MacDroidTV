@@ -212,6 +212,17 @@ final class AppModel {
         }
     }
 
+    func moveQuickApp(id: String, up: Bool) {
+        mutateState { state in
+            var ids = state.quickAppIDs ?? state.selectedQuickApps.map(\.id)
+            guard let index = ids.firstIndex(of: id) else { return }
+            let target = up ? index - 1 : index + 1
+            guard ids.indices.contains(target) else { return }
+            ids.swapAt(index, target)
+            state.quickAppIDs = ids
+        }
+    }
+
     func removeCustomQuickApp(id: String) {
         mutateState { state in
             state.customApps?.removeAll { $0.id == id }

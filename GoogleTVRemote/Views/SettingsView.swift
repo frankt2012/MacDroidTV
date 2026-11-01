@@ -1,3 +1,4 @@
+import ServiceManagement
 import SwiftUI
 import TVRemoteKit
 
@@ -10,6 +11,8 @@ struct SettingsView: View {
     @AppStorage("showPowerDot") private var showPowerDot = true
     @State private var customName = ""
     @State private var customLink = ""
+    @State private var launchAtLogin = false
+    @State private var launchAtLoginError: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -28,6 +31,20 @@ struct SettingsView: View {
                     Text("Green means the TV is on; red means it is off.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+
+                    Toggle("Launch at login", isOn: Binding(
+                        get: { launchAtLogin },
+                        set: { setLaunchAtLogin($0) }
+                    ))
+                    if let launchAtLoginError {
+                        Text(launchAtLoginError)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    } else if SMAppService.mainApp.status == .requiresApproval {
+                        Text("Approve MacDroid TV in System Settings → General → Login Items.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
 
                     Divider()
 
@@ -57,6 +74,38 @@ struct SettingsView: View {
                                 }
                                 .buttonStyle(.borderless)
                                 .help("Remove \(app.name)")
+                            }
+                        }
+                    }
+
+                    if model.selectedQuickApps.count > 1 {
+                        Divider()
+                        Text("Quick app order")
+                            .font(.subheadline.weight(.semibold))
+                        Text("Use the arrows to choose the order used in the widget and panel.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        ForEach(model.selectedQuickApps) { app in
+                            HStack(spacing: 10) {
+                                QuickAppBadge(app: app, size: 22)
+                                    .frame(width: 30, height: 22)
+                                Text(app.name)
+                                Spacer()
+                                Button {
+                                    model.moveQuickApp(id: app.id, up: true)
+                                } label: {
+                                    Image(systemName: "chevron.up")
+                                }
+                                .buttonStyle(.borderless)
+                                .disabled(model.selectedQuickApps.first?.id == app.id)
+                                Button {
+                                    model.moveQuickApp(id: app.id, up: false)
+                                } label: {
+                                    Image(systemName: "chevron.down")
+                                }
+                                .buttonStyle(.borderless)
+                                .disabled(model.selectedQuickApps.last?.id == app.id)
                             }
                         }
                     }
@@ -104,6 +153,24 @@ struct SettingsView: View {
             .padding(12)
         }
         .frame(width: 380, height: 560)
+        .onAppear {
+            launchAtLogin = SMAppService.mainApp.status == .enabled
+        }
+    }
+
+    private func setLaunchAtLogin(_ enabled: Bool) {
+        do {
+            if enabled {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
+            launchAtLogin = enabled
+            launchAtLoginError = nil
+        } catch {
+            launchAtLoginError = error.localizedDescription
+            launchAtLogin = SMAppService.mainApp.status == .enabled
+        }
     }
 
 }
