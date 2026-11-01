@@ -66,15 +66,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// Render the `av.remote` symbol into a bitmap-backed template image.
     /// A plain `NSImage(systemSymbolName:)` did not paint in the status item.
     private func makeStatusImage(filled: Bool) -> NSImage {
-        // macOS will not paint `av.remote` (or a custom bitmap of it) in a
-        // status item; the app icon is a remote and renders reliably.
+        // Load the icon file directly; NSImage(named:) can return a stale
+        // LaunchServices copy after the app icon changes.
+        if let url = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
+           let image = NSImage(contentsOf: url) {
+            image.size = NSSize(width: 22, height: 22)
+            image.isTemplate = false
+            return image
+        }
         if let icon = NSImage(named: NSImage.applicationIconName) {
             icon.size = NSSize(width: 22, height: 22)
             icon.isTemplate = false
             return icon
         }
         let image = NSImage(systemSymbolName: "mediastick", accessibilityDescription: "Google TV Remote")!
-        image.size = NSSize(width: 22, height: 22)
         image.isTemplate = true
         return image
     }
