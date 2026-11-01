@@ -103,6 +103,8 @@ public struct RemoteState: Codable, Equatable, Sendable {
     public var quickAppIDs: [String]?
     /// User-defined app shortcuts.
     public var customApps: [QuickApp]?
+    /// Opacity of the widget background (0.1...1.0). Nil means 1.0.
+    public var widgetOpacity: Double?
 
     public init(
         identity: StoredIdentity? = nil,
@@ -111,7 +113,8 @@ public struct RemoteState: Codable, Equatable, Sendable {
         cache: CachedTVState = CachedTVState(),
         clientName: String = "Mac Remote",
         quickAppIDs: [String]? = nil,
-        customApps: [QuickApp]? = nil
+        customApps: [QuickApp]? = nil,
+        widgetOpacity: Double? = nil
     ) {
         self.identity = identity
         self.devices = devices
@@ -120,6 +123,7 @@ public struct RemoteState: Codable, Equatable, Sendable {
         self.clientName = clientName
         self.quickAppIDs = quickAppIDs
         self.customApps = customApps
+        self.widgetOpacity = widgetOpacity
     }
 
     /// Every app the settings UI can offer.
@@ -177,6 +181,7 @@ public struct WidgetSnapshot: Equatable, Sendable {
     public var updatedAt: Date?
     public var volumeEstimated: Bool
     public var quickApps: [QuickApp]
+    public var widgetOpacity: Double
 
     public init(
         isPaired: Bool,
@@ -187,7 +192,8 @@ public struct WidgetSnapshot: Equatable, Sendable {
         muted: Bool,
         updatedAt: Date?,
         volumeEstimated: Bool = false,
-        quickApps: [QuickApp] = QuickApp.featured
+        quickApps: [QuickApp] = QuickApp.featured,
+        widgetOpacity: Double = 1.0
     ) {
         self.isPaired = isPaired
         self.deviceName = deviceName
@@ -198,6 +204,7 @@ public struct WidgetSnapshot: Equatable, Sendable {
         self.updatedAt = updatedAt
         self.volumeEstimated = volumeEstimated
         self.quickApps = quickApps
+        self.widgetOpacity = widgetOpacity
     }
 
     public static func load(from store: SharedStore = .shared) -> WidgetSnapshot {
@@ -212,7 +219,8 @@ public struct WidgetSnapshot: Equatable, Sendable {
             muted: state.cache.muted,
             updatedAt: state.cache.updatedAt,
             volumeEstimated: state.cache.volumeEstimated ?? false,
-            quickApps: state.selectedQuickApps
+            quickApps: state.selectedQuickApps,
+            widgetOpacity: state.widgetOpacity ?? 1.0
         )
     }
 }

@@ -65,6 +65,7 @@ struct TVRemoteWidgetEntryView: View {
                     endPoint: .bottomTrailing
                 )
             }
+            .opacity(entry.snapshot.widgetOpacity)
         }
     }
 

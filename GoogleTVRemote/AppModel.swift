@@ -219,6 +219,14 @@ final class AppModel {
         }
     }
 
+    var widgetOpacity: Double { state.widgetOpacity ?? 1.0 }
+
+    func setWidgetOpacity(_ value: Double) {
+        mutateState { state in
+            state.widgetOpacity = Swift.min(Swift.max(value, 0.1), 1.0)
+        }
+    }
+
     func syncVolume(level: Int, step: Int) {
         mutateState { state in
             VolumeEstimate.sync(level: level, step: step, to: &state.cache)
