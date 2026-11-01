@@ -34,14 +34,26 @@ struct SettingsView: View {
 
                     ForEach(model.allQuickApps) { app in
                         HStack(spacing: 10) {
-                            Text(app.shortLabel)
-                                .font(.system(size: 10, weight: .bold))
-                                .frame(width: 30, height: 22)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .fill(appTint(app).opacity(0.18))
-                                )
-                                .foregroundStyle(appTint(app))
+                            Group {
+                                if let logo = app.logoName {
+                                    Image(logo)
+                                        .resizable()
+                                        .interpolation(.high)
+                                        .scaledToFit()
+                                        .frame(width: 22, height: 22)
+                                        .clipShape(RoundedRectangle(cornerRadius: 5))
+                                } else {
+                                    Text(app.shortLabel)
+                                        .font(.system(size: 10, weight: .bold))
+                                        .frame(width: 30, height: 22)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 6)
+                                                .fill(appTint(app).opacity(0.18))
+                                        )
+                                        .foregroundStyle(appTint(app))
+                                }
+                            }
+                            .frame(width: 30, height: 22)
 
                             Toggle(app.name, isOn: Binding(
                                 get: { model.isQuickAppSelected(app.id) },

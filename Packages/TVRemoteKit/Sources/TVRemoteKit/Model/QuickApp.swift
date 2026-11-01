@@ -17,6 +17,17 @@ public struct QuickApp: Identifiable, Hashable, Codable, Sendable {
         self.link = link
     }
 
+    /// Asset-catalog name for the app's logo, when one is bundled.
+    public var logoName: String? {
+        switch id {
+        case "netflix", "youtube", "primevideo", "disneyplus", "max",
+             "plex", "spotify", "appletv":
+            return "AppLogo_\(id)"
+        default:
+            return nil
+        }
+    }
+
     /// Turns a package name or a full URI into a launch link. Android TV's
     /// remote service rejects `market://launch` links, but accepts
     /// `android-app://<package>`, which resolves to the installed app.

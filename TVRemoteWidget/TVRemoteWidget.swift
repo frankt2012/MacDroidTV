@@ -233,14 +233,25 @@ struct TVRemoteWidgetEntryView: View {
     /// Opens a streaming app through its Android TV deep link.
     private func appButton(_ app: QuickApp, size: CGFloat) -> some View {
         Button(intent: RemoteAppLinkIntent(link: app.link, appName: app.name)) {
-            Text(app.shortLabel)
-                .font(.system(size: size * 0.38, weight: .bold))
-                .frame(width: size, height: size)
-                .background(
-                    RoundedRectangle(cornerRadius: size * 0.28)
-                        .fill(appTint(app).opacity(0.18))
-                )
-                .foregroundStyle(appTint(app))
+            Group {
+                if let logo = app.logoName {
+                    Image(logo)
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFit()
+                        .clipShape(RoundedRectangle(cornerRadius: size * 0.22))
+                } else {
+                    Text(app.shortLabel)
+                        .font(.system(size: size * 0.38, weight: .bold))
+                        .frame(width: size, height: size)
+                        .background(
+                            RoundedRectangle(cornerRadius: size * 0.28)
+                                .fill(appTint(app).opacity(0.18))
+                        )
+                        .foregroundStyle(appTint(app))
+                }
+            }
+            .frame(width: size, height: size)
         }
         .buttonStyle(.plain)
         .help("Open \(app.name)")

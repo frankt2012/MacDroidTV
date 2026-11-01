@@ -30,6 +30,7 @@ targets:
     platform: macOS
     sources:
       - path: GoogleTVRemote
+      - path: SharedAssets.xcassets
     dependencies:
       - package: TVRemoteKit
       - target: TVRemoteWidgetExtension
@@ -52,6 +53,7 @@ targets:
     platform: macOS
     sources:
       - path: TVRemoteWidget
+      - path: SharedAssets.xcassets
     dependencies:
       - package: TVRemoteKit
     settings:

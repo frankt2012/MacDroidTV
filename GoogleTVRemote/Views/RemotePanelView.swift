@@ -233,14 +233,26 @@ struct RemotePanelView: View {
                 Button {
                     model.openApp(app)
                 } label: {
-                    Text(app.shortLabel)
-                        .font(.system(size: 11, weight: .bold))
-                        .frame(width: 38, height: 28)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(appTint(app).opacity(0.18))
-                        )
-                        .foregroundStyle(appTint(app))
+                    Group {
+                        if let logo = app.logoName {
+                            Image(logo)
+                                .resizable()
+                                .interpolation(.high)
+                                .scaledToFit()
+                                .frame(width: 26, height: 26)
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                        } else {
+                            Text(app.shortLabel)
+                                .font(.system(size: 11, weight: .bold))
+                                .frame(width: 38, height: 28)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(appTint(app).opacity(0.18))
+                                )
+                                .foregroundStyle(appTint(app))
+                        }
+                    }
+                    .frame(width: 38, height: 28)
                 }
                 .buttonStyle(.plain)
                 .help("Open \(app.name)")
