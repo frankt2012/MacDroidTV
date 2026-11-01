@@ -7,6 +7,8 @@ import WidgetKit
 struct GoogleTVRemoteApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var model: AppModel
+    /// Menu bar control can be hidden for a widget-only setup.
+    @AppStorage("showMenuBarIcon") private var showMenuBarIcon = true
 
     init() {
         if CommandLine.arguments.contains("--touch-state") {
@@ -225,7 +227,7 @@ struct GoogleTVRemoteApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra {
+        MenuBarExtra(isInserted: $showMenuBarIcon) {
             RemotePanelView(model: model)
         } label: {
             Label(

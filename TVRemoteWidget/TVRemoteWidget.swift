@@ -86,6 +86,12 @@ struct TVRemoteWidgetEntryView: View {
             .frame(maxHeight: .infinity)
 
             HStack(spacing: 8) {
+                key(.rewind, "backward.fill", size: 18)
+                key(.playPause, "playpause.fill", size: 18)
+                key(.fastForward, "forward.fill", size: 18)
+            }
+
+            HStack(spacing: 8) {
                 key(.back, "arrow.uturn.backward", size: 20)
                 key(.home, "house", size: 20)
                 Spacer(minLength: 0)
@@ -120,6 +126,12 @@ struct TVRemoteWidgetEntryView: View {
                         .foregroundStyle(.secondary)
                     Spacer(minLength: 0)
                     syncLink(size: 24)
+                }
+
+                HStack(spacing: 10) {
+                    key(.rewind, "backward.fill", size: 22)
+                    key(.playPause, "playpause.fill", size: 24)
+                    key(.fastForward, "forward.fill", size: 22)
                 }
 
                 HStack(spacing: 10) {
@@ -162,6 +174,8 @@ struct TVRemoteWidgetEntryView: View {
                 .lineLimit(1)
 
             Spacer(minLength: 2)
+
+            settingsLink(size: compact ? 16 : 18)
 
             Button(intent: RemoteKeyIntent(key: .power)) {
                 Image(systemName: "power")
@@ -217,6 +231,17 @@ struct TVRemoteWidgetEntryView: View {
                 .background(Circle().fill(Color.primary.opacity(0.08)))
         }
         .help("Sync volume")
+    }
+
+    /// Opens the app's settings window.
+    private func settingsLink(size: CGFloat) -> some View {
+        Link(destination: URL(string: "googletvremote://settings")!) {
+            Image(systemName: "gearshape")
+                .font(.system(size: size * 0.55, weight: .semibold))
+                .frame(width: size, height: size)
+                .foregroundStyle(.secondary)
+        }
+        .help("Settings")
     }
 
     // MARK: - Derived state
