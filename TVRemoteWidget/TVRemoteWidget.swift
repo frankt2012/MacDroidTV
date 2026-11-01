@@ -161,11 +161,24 @@ struct TVRemoteWidgetEntryView: View {
 
     // MARK: - Pieces
 
+    @ViewBuilder
+    private var powerDot: some View {
+        let name = entry.snapshot.isOn ? "PowerDotGreen" : "PowerDotRed"
+        if #available(macOS 15.0, *) {
+            Image(name)
+                .resizable()
+                .widgetAccentedRenderingMode(.fullColor)
+                .frame(width: 7, height: 7)
+        } else {
+            Image(name)
+                .resizable()
+                .frame(width: 7, height: 7)
+        }
+    }
+
     private func header(compact: Bool) -> some View {
         HStack(spacing: 5) {
-            Circle()
-                .fill(entry.snapshot.isOn ? Color.green : Color.secondary)
-                .frame(width: 6, height: 6)
+            powerDot
 
             Text(entry.snapshot.deviceName)
                 .font(compact ? .caption.weight(.semibold) : .subheadline.weight(.semibold))
