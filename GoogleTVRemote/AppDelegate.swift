@@ -96,8 +96,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// Render the `av.remote` symbol into a bitmap-backed template image.
     /// A plain `NSImage(systemSymbolName:)` did not paint in the status item.
     private func makeStatusImage(filled: Bool) -> NSImage {
-        // Load the icon file directly; NSImage(named:) can return a stale
-        // LaunchServices copy after the app icon changes.
+        // A dedicated status item icon: white remote on a dark tile, separate
+        // from the colorful MacDroid TV app icon.
+        if let url = Bundle.main.url(forResource: "StatusRemote", withExtension: "icns"),
+           let image = NSImage(contentsOf: url) {
+            image.size = NSSize(width: 22, height: 22)
+            image.isTemplate = false
+            return image
+        }
         if let url = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
            let image = NSImage(contentsOf: url) {
             image.size = NSSize(width: 22, height: 22)
