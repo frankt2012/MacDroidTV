@@ -177,6 +177,21 @@ struct GoogleTVRemoteApp: App {
             exit(0)
         }
 
+        if CommandLine.arguments.contains("--post-refresh") {
+            let id = CommandBridge.postRefresh()
+            let sem = DispatchSemaphore(value: 0)
+            var message = "no response"
+            Task.detached {
+                if let outcome = await CommandBridge.waitForResult(id: id, timeout: 10) {
+                    message = outcome.flatMap { $0.isEmpty ? nil : $0 } ?? "ok"
+                }
+                sem.signal()
+            }
+            _ = sem.wait(timeout: .now() + 12)
+            print("post-refresh: \(message)")
+            exit(0)
+        }
+
         if let index = CommandLine.arguments.firstIndex(of: "--post-link") {
             let link = CommandLine.arguments.dropFirst(index + 1).first ?? "market://launch?id=com.netflix.ninja"
             let id = CommandBridge.post(link: link)

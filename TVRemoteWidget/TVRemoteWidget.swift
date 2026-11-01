@@ -178,6 +178,7 @@ struct TVRemoteWidgetEntryView: View {
 
             Spacer(minLength: 2)
 
+            refreshButton(size: compact ? 16 : 18)
             settingsLink(size: compact ? 16 : 18)
 
             Button(intent: RemoteKeyIntent(key: .power)) {
@@ -262,6 +263,18 @@ struct TVRemoteWidgetEntryView: View {
         case "spotify": return Color(red: 0.1, green: 0.7, blue: 0.3)
         default: return .gray
         }
+    }
+
+    /// Re-reads the TV's power and volume state.
+    private func refreshButton(size: CGFloat) -> some View {
+        Button(intent: RefreshTVStateIntent()) {
+            Image(systemName: "arrow.clockwise")
+                .font(.system(size: size * 0.55, weight: .semibold))
+                .frame(width: size, height: size)
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .help("Refresh TV status")
     }
 
     /// Opens the app's settings window.

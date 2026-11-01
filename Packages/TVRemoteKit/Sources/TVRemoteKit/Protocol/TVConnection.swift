@@ -284,7 +284,10 @@ public actor TVConnection {
             }
 
         case .error:
-            onEvent?(.disconnected("The TV reported an error."))
+            // A TV answers an app-link launch it cannot resolve with an error
+            // frame. That is a rejected request, not a dead connection, so keep
+            // the session and let the next key work normally.
+            log("<- TV rejected the last request")
 
         default:
             break

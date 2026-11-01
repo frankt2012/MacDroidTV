@@ -17,29 +17,31 @@ public struct QuickApp: Identifiable, Hashable, Codable, Sendable {
         self.link = link
     }
 
-    /// Turns a package name or a full URI into a launch link.
+    /// Turns a package name or a full URI into a launch link. Android TV's
+    /// remote service rejects `market://launch` links, but accepts
+    /// `android-app://<package>`, which resolves to the installed app.
     public static func launchLink(from input: String) -> String {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.contains("://") { return trimmed }
-        return "market://launch?id=\(trimmed)"
+        return "android-app://\(trimmed)"
     }
 
-    private static func app(_ id: String, _ name: String, _ label: String, _ package: String) -> QuickApp {
-        QuickApp(id: id, name: name, shortLabel: label, link: launchLink(from: package))
+    private static func app(_ id: String, _ name: String, _ label: String, _ link: String) -> QuickApp {
+        QuickApp(id: id, name: name, shortLabel: label, link: link)
     }
 
     /// The services that show up as dedicated buttons on most Google TV
     /// remotes, plus the most-used installed apps.
     public static let common: [QuickApp] = [
-        app("netflix", "Netflix", "N", "com.netflix.ninja"),
-        app("youtube", "YouTube", "YT", "com.google.android.youtube.tv"),
-        app("primevideo", "Prime Video", "P", "com.amazon.amazonvideo.livingroom"),
-        app("disneyplus", "Disney+", "D+", "com.disney.disneyplus"),
-        app("max", "Max", "Max", "com.wbd.stream"),
-        app("plex", "Plex", "Plex", "com.plexapp.android"),
-        app("youtubetv", "YouTube TV", "YTTV", "com.google.android.apps.youtube.unplugged"),
-        app("spotify", "Spotify", "S", "com.spotify.tv.android"),
-        app("appletv", "Apple TV", "TV", "com.apple.atve.androidtv.appletv")
+        app("netflix", "Netflix", "N", "https://www.netflix.com/title"),
+        app("youtube", "YouTube", "YT", "https://www.youtube.com"),
+        app("primevideo", "Prime Video", "P", "https://app.primevideo.com"),
+        app("disneyplus", "Disney+", "D+", "https://www.disneyplus.com"),
+        app("max", "Max", "Max", "https://play.max.com"),
+        app("plex", "Plex", "Plex", "plex://"),
+        app("youtubetv", "YouTube TV", "YTTV", "https://tv.youtube.com"),
+        app("spotify", "Spotify", "S", "spotify://"),
+        app("appletv", "Apple TV", "TV", "https://tv.apple.com")
     ]
 
     /// The default selection when the user has not chosen anything yet.

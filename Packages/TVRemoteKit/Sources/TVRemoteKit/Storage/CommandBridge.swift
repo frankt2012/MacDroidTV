@@ -10,12 +10,15 @@ public struct RemoteCommand: Codable, Sendable {
     public let key: String?
     /// An app deep link, or nil when this command sends a key.
     public let link: String?
+    /// Re-read the TV's power/volume state.
+    public let refresh: Bool?
     public let createdAt: Date
 
     public init(id: UUID = UUID(), key: RemoteKey, createdAt: Date = Date()) {
         self.id = id
         self.key = key.rawValue
         self.link = nil
+        self.refresh = nil
         self.createdAt = createdAt
     }
 
@@ -23,6 +26,15 @@ public struct RemoteCommand: Codable, Sendable {
         self.id = id
         self.key = nil
         self.link = link
+        self.refresh = nil
+        self.createdAt = createdAt
+    }
+
+    public init(id: UUID = UUID(), refresh: Bool, createdAt: Date = Date()) {
+        self.id = id
+        self.key = nil
+        self.link = nil
+        self.refresh = refresh
         self.createdAt = createdAt
     }
 }
@@ -46,6 +58,11 @@ public enum CommandBridge {
     @discardableResult
     public static func post(link: String) -> UUID {
         post(RemoteCommand(link: link))
+    }
+
+    @discardableResult
+    public static func postRefresh() -> UUID {
+        post(RemoteCommand(refresh: true))
     }
 
     private static func post(_ command: RemoteCommand) -> UUID {

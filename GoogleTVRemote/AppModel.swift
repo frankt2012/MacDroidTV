@@ -91,6 +91,8 @@ final class AppModel {
                             await self.performSend(key)
                         } else if let link = command.link {
                             await self.performAppLink(link)
+                        } else if command.refresh == true {
+                            await self.refreshNow()
                         }
                         CommandBridge.writeResult(id: command.id, error: self.lastError)
                     } else {
@@ -424,25 +426,29 @@ final class AppModel {
 
     func refresh() {
         Task { [weak self] in
-            guard let self else { return }
-            self.isRefreshing = true
-            defer { self.isRefreshing = false }
+            await self?.refreshNow()
+        }
+    }
 
-            guard let connection = await self.ensureConnection() else { return }
-            do {
-                let isOn = try await connection.refresh()
-                let volume = await connection.volumeInfo
-                self.status = .connected
-                if let device = self.state.activeDevice {
-                    self.markSeen(device)
-                }
-                self.updateCache(isOn: isOn, volume: volume)
-            } catch {
-                self.lastError = error.localizedDescription
-                self.status = .failed(error.localizedDescription)
-                self.connection = nil
-                self.connectionDeviceID = nil
+    /// Awaitable version used by the widget's refresh button.
+    func refreshNow() async {
+        isRefreshing = true
+        defer { isRefreshing = false }
+
+        guard let connection = await ensureConnection() else { return }
+        do {
+            let isOn = try await connection.refresh()
+            let volume = await connection.volumeInfo
+            status = .connected
+            if let device = state.activeDevice {
+                markSeen(device)
             }
+            updateCache(isOn: isOn, volume: volume)
+        } catch {
+            lastError = error.localizedDescription
+            status = .failed(error.localizedDescription)
+            self.connection = nil
+            connectionDeviceID = nil
         }
     }
 

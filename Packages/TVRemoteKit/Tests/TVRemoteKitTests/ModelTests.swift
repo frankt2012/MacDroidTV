@@ -140,10 +140,10 @@ final class WakeOnLANTests: XCTestCase {
 }
 
 final class QuickAppTests: XCTestCase {
-    func testPackageNameBecomesMarketLaunchLink() {
+    func testPackageNameBecomesAndroidAppLink() {
         XCTAssertEqual(
             QuickApp.launchLink(from: "com.netflix.ninja"),
-            "market://launch?id=com.netflix.ninja"
+            "android-app://com.netflix.ninja"
         )
     }
 
@@ -174,7 +174,7 @@ final class QuickAppTests: XCTestCase {
         XCTAssertNil(QuickApp.common.first(where: { $0.id == "hulu" }))
         XCTAssertEqual(
             QuickApp.common.first(where: { $0.id == "max" })?.link,
-            "market://launch?id=com.wbd.stream"
+            "https://play.max.com"
         )
     }
 }

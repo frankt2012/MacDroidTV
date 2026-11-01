@@ -334,6 +334,19 @@ public struct RefreshTVStateIntent: AppIntent {
     public init() {}
 
     public func perform() async throws -> some IntentResult {
+        SharedStore.shared.appendDebugLog("[widget-intent] refresh")
+        let appID = "com.franktriolo.googletvremote"
+        let appRunning = !NSRunningApplication.runningApplications(withBundleIdentifier: appID).isEmpty
+        if appRunning {
+            let id = CommandBridge.postRefresh()
+            if let outcome = await CommandBridge.waitForResult(id: id, timeout: 10) {
+                if let error = outcome, !error.isEmpty {
+                    SharedStore.shared.appendDebugLog("[widget-intent] refresh failed: \(error)")
+                }
+            }
+            return .result()
+        }
+
         try await WidgetRemote.shared.refresh()
         return .result()
     }
