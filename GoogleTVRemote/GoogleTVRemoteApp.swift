@@ -142,7 +142,6 @@ struct GoogleTVRemoteApp: App {
             print("volumeEstimated=\(state.cache.volumeEstimated.map(String.init) ?? "nil")")
             print("quickApps=\(state.selectedQuickApps.map(\.id).joined(separator: ","))")
             print("customApps=\(state.customApps?.map(\.name).joined(separator: ",") ?? "nil")")
-            print("widgetOpacity=\(state.widgetOpacity.map { String(format: "%.2f", $0) } ?? "nil")")
             print("cacheUpdatedAt=\(state.cache.updatedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "nil")")
             print("lastSaveError=\(store.lastSaveError ?? "nil")")
             print("hostName=\(Host.current().localizedName ?? "nil")")
@@ -237,17 +236,6 @@ struct GoogleTVRemoteApp: App {
                 await Task.yield()
                 model.resetQuickApps()
                 print("reset quick apps")
-                exit(0)
-            }
-        }
-
-        if let index = CommandLine.arguments.firstIndex(of: "--set-widget-opacity") {
-            let value = Double(CommandLine.arguments.dropFirst(index + 1).first ?? "1") ?? 1
-            let model = _model.wrappedValue
-            Task { @MainActor in
-                await Task.yield()
-                model.setWidgetOpacity(value)
-                print("widget opacity=\(model.widgetOpacity)")
                 exit(0)
             }
         }

@@ -23,26 +23,6 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack {
-                            Text("Widget background tint")
-                            Spacer()
-                            Text("\(Int((model.widgetOpacity * 100).rounded()))%")
-                                .monospacedDigit()
-                                .foregroundStyle(.secondary)
-                        }
-                        Slider(
-                            value: Binding(
-                                get: { model.widgetOpacity },
-                                set: { model.setWidgetOpacity($0) }
-                            ),
-                            in: 0.1...1.0
-                        )
-                        Text("Lower values let more of the desktop show through the glass.")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-
                     Divider()
 
                     Text("Quick apps")
