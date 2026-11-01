@@ -63,16 +63,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         statusItem?.isVisible = visible
     }
 
-    /// The status bar would not render the `av.remote` symbol or a custom
-    /// bitmap reliably, so use the app's own remote icon.
+    /// Render the `av.remote` symbol into a bitmap-backed template image.
+    /// A plain `NSImage(systemSymbolName:)` did not paint in the status item.
     private func makeStatusImage(filled: Bool) -> NSImage {
-        if let icon = NSImage(named: NSImage.applicationIconName) {
-            icon.size = NSSize(width: 18, height: 18)
-            icon.isTemplate = false
-            return icon
-        }
-        let image = NSImage(systemSymbolName: "tv", accessibilityDescription: "Google TV Remote")!
-        image.size = NSSize(width: 18, height: 18)
+        // `mediastick` is the Apple TV remote glyph and renders reliably in
+        // the status bar, unlike the `av.remote` glyph.
+        let image = NSImage(systemSymbolName: "mediastick", accessibilityDescription: "Google TV Remote")!
+        image.size = NSSize(width: 22, height: 22)
         image.isTemplate = true
         return image
     }
