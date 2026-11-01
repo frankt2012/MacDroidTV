@@ -37,7 +37,7 @@ targets:
         embed: true
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.franktriolo.googletvremote
+        PRODUCT_BUNDLE_IDENTIFIER: com.franktriolo.macdroidtv
         PRODUCT_NAME: MacDroid TV
         INFOPLIST_FILE: GoogleTVRemote/Info.plist
         CODE_SIGN_ENTITLEMENTS: GoogleTVRemote/GoogleTVRemote.entitlements
@@ -58,7 +58,7 @@ targets:
       - package: TVRemoteKit
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.franktriolo.googletvremote.macdroidtv
+        PRODUCT_BUNDLE_IDENTIFIER: com.franktriolo.macdroidtv.widget
         PRODUCT_NAME: TVRemoteWidgetExtension
         INFOPLIST_FILE: TVRemoteWidget/Info.plist
         CODE_SIGN_ENTITLEMENTS: TVRemoteWidget/TVRemoteWidget.entitlements

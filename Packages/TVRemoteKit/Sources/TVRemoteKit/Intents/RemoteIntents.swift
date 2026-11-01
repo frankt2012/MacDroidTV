@@ -265,7 +265,7 @@ public struct RemoteKeyIntent: AppIntent {
 
         // Fast path: use the menu bar app's already-open connection. This
         // avoids a TLS handshake per tap and keeps a single remote session.
-        let appID = "com.franktriolo.googletvremote"
+        let appID = "com.franktriolo.macdroidtv"
         let appRunning = !NSRunningApplication.runningApplications(withBundleIdentifier: appID).isEmpty
         if appRunning {
             let id = CommandBridge.post(remoteKey, deviceID: deviceID.flatMap(UUID.init(uuidString:)))
@@ -319,7 +319,7 @@ public struct RemoteAppLinkIntent: AppIntent {
 
     public func perform() async throws -> some IntentResult {
         SharedStore.shared.appendDebugLog("[widget-intent] open app \(appName)")
-        let appID = "com.franktriolo.googletvremote"
+        let appID = "com.franktriolo.macdroidtv"
         let appRunning = !NSRunningApplication.runningApplications(withBundleIdentifier: appID).isEmpty
         if appRunning {
             let id = CommandBridge.post(link: link, deviceID: deviceID.flatMap(UUID.init(uuidString:)))
@@ -361,7 +361,7 @@ public struct RefreshTVStateIntent: AppIntent {
 
     public func perform() async throws -> some IntentResult {
         SharedStore.shared.appendDebugLog("[widget-intent] refresh")
-        let appID = "com.franktriolo.googletvremote"
+        let appID = "com.franktriolo.macdroidtv"
         let appRunning = !NSRunningApplication.runningApplications(withBundleIdentifier: appID).isEmpty
         if appRunning {
             let id = CommandBridge.postRefresh(deviceID: deviceID.flatMap(UUID.init(uuidString:)))
