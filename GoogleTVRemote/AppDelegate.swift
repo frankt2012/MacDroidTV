@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
     private var defaultsObserver: NSObjectProtocol?
+    private var powerObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupStatusItem()
@@ -30,7 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = item.button {
             button.image = makeStatusImage(filled: false)
-            button.imagePosition = .imageOnly
+            button.imagePosition = .imageLeft
             button.target = self
             button.action = #selector(togglePopover(_:))
         }
@@ -47,6 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         statusItem = item
         self.popover = popover
+        updateStatusButton(isOn: model.isOn)
 
         applyMenuBarVisibility()
         defaultsObserver = NotificationCenter.default.addObserver(
@@ -55,6 +57,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             queue: .main
         ) { [weak self] _ in
             self?.applyMenuBarVisibility()
+        }
+        powerObserver = NotificationCenter.default.addObserver(
+            forName: .tvPowerStateChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.updateStatusButton(isOn: AppModel.shared?.isOn ?? false)
         }
     }
 
@@ -84,6 +93,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         return image
     }
 
+    /// Shows a green/red dot next to the remote icon for the TV's power state.
+    private func updateStatusButton(isOn: Bool) {
+        guard let button = statusItem?.button else { return }
+        button.image = makeStatusImage(filled: false)
+        button.imagePosition = .imageLeft
+        let dot = isOn ? " 🟢" : " 🔴"
+        button.attributedTitle = NSAttributedString(
+            string: dot,
+            attributes: [.font: NSFont.systemFont(ofSize: 10)]
+        )
+    }
+
     @objc private func togglePopover(_ sender: Any?) {
         guard let statusItem, let button = statusItem.button, let popover else { return }
 
@@ -92,9 +113,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return
         }
 
-        if let model = AppModel.shared {
-            button.image = makeStatusImage(filled: model.isConnected)
-        }
+        updateStatusButton(isOn: AppModel.shared?.isOn ?? false)
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         NSApp.activate(ignoringOtherApps: true)
     }

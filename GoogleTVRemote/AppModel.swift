@@ -746,7 +746,11 @@ final class AppModel {
     }
 
     private func mutateState(_ mutate: (inout RemoteState) -> Void) {
+        let wasOn = state.cache.isOn
         state = store.update(mutate)
+        if state.cache.isOn != wasOn {
+            NotificationCenter.default.post(name: .tvPowerStateChanged, object: nil)
+        }
         WidgetCenter.shared.reloadAllTimelines()
     }
 
@@ -961,4 +965,13 @@ final class AppModel {
         }
         return host
     }
+}
+
+
+extension Notification.Name {
+    /// Posted when the cached TV power state changes, so the status item can
+    /// update its on/off dot.
+    static let tvPowerStateChanged = Notification.Name(
+        "com.franktriolo.googletvremote.powerStateChanged"
+    )
 }
