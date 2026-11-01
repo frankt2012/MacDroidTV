@@ -13,8 +13,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var popover: NSPopover?
     private var defaultsObserver: NSObjectProtocol?
     private var powerObserver: NSObjectProtocol?
+    /// `isVisible` posts the same defaults notification that triggered us, so
+    /// guard against re-entering this method.
+    private var isApplyingMenuBarVisibility = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Hiding the last status item must not let AppKit terminate the app;
+        // it still has to service widget commands.
+        ProcessInfo.processInfo.disableSuddenTermination()
+        ProcessInfo.processInfo.disableAutomaticTermination("Keeps the TV connection alive")
         setupStatusItem()
     }
 
@@ -69,8 +76,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private func applyMenuBarVisibility() {
+        guard !isApplyingMenuBarVisibility else { return }
+        isApplyingMenuBarVisibility = true
+        defer { isApplyingMenuBarVisibility = false }
+
         let visible = UserDefaults.standard.object(forKey: "showMenuBarIcon") as? Bool ?? true
-        statusItem?.isVisible = visible
+        if statusItem?.isVisible != visible {
+            statusItem?.isVisible = visible
+        }
+
+        // Hiding the status item can deactivate the app and make the Settings
+        // window look like it closed. Keep it in front instead.
+        if let settingsWindow, settingsWindow.isVisible {
+            settingsWindow.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        }
     }
 
     /// Render the `av.remote` symbol into a bitmap-backed template image.
@@ -130,7 +150,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         // Widget-only mode hides the status item; the app must stay alive so
         // the widget can keep using its connection.
-        false
+        return false
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -229,5 +249,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         guard let window = notification.object as? NSWindow else { return }
         if window === syncWindow { syncWindow = nil }
         if window === settingsWindow { settingsWindow = nil }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        SharedStore.shared.appendDebugLog("[settings] applicationWillTerminate")
     }
 }
