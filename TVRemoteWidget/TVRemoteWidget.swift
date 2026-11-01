@@ -84,11 +84,12 @@ struct TVRemoteWidgetEntryView: View {
                 key(.fastForward, "forward.fill", size: 18)
             }
 
-            HStack(spacing: 8) {
-                key(.back, "arrow.uturn.backward", size: 20)
-                key(.home, "house", size: 20)
+            HStack(spacing: 6) {
+                key(.back, "arrow.uturn.backward", size: 18)
+                key(.home, "house", size: 18)
+                key(.settings, "gearshape", size: 18)
                 Spacer(minLength: 0)
-                syncLink(size: 20)
+                syncLink(size: 18)
                 Text(volumeText)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -133,10 +134,11 @@ struct TVRemoteWidgetEntryView: View {
             VStack(spacing: 6) {
                 dpad(buttonSize: 31)
 
-                HStack(spacing: 8) {
-                    key(.back, "arrow.uturn.backward", size: 24)
-                    key(.home, "house", size: 24)
-                    key(.menu, "list.bullet", size: 24)
+                HStack(spacing: 6) {
+                    key(.back, "arrow.uturn.backward", size: 22)
+                    key(.home, "house", size: 22)
+                    key(.menu, "list.bullet", size: 22)
+                    key(.settings, "gearshape", size: 22)
                 }
             }
         }
