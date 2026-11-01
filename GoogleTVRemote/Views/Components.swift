@@ -34,6 +34,7 @@ struct RemoteKeyButton: View {
     let key: RemoteKey
     let systemImage: String
     var size: CGFloat = 40
+    var help: String? = nil
     let action: () -> Void
 
     @State private var hovering = false
@@ -51,7 +52,7 @@ struct RemoteKeyButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
-        .help(key.accessibilityLabel)
+        .help(help ?? key.accessibilityLabel)
     }
 }
 

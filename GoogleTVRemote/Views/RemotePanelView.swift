@@ -131,7 +131,7 @@ struct RemotePanelView: View {
             keyButton(.home, "house")
             keyButton(.menu, "list.bullet")
             keyButton(.tv, "tv")
-            keyButton(.settings, "gearshape")
+            keyButton(.settings, "gearshape", help: "TV settings")
         }
     }
 
@@ -243,8 +243,13 @@ struct RemotePanelView: View {
         .padding(.top, 2)
     }
 
-    private func keyButton(_ key: RemoteKey, _ symbol: String, size: CGFloat = 36) -> some View {
-        RemoteKeyButton(key: key, systemImage: symbol, size: size) {
+    private func keyButton(
+        _ key: RemoteKey,
+        _ symbol: String,
+        size: CGFloat = 36,
+        help: String? = nil
+    ) -> some View {
+        RemoteKeyButton(key: key, systemImage: symbol, size: size, help: help) {
             model.send(key)
         }
     }
@@ -302,9 +307,9 @@ struct RemotePanelView: View {
                     NSWorkspace.shared.open(url)
                 }
             } label: {
-                Image(systemName: "gearshape")
+                Image(systemName: "gearshape.2")
             }
-            .help("Settings")
+            .help("App settings")
 
             Button("Quit") {
                 NSApp.terminate(nil)

@@ -254,12 +254,12 @@ struct TVRemoteWidgetEntryView: View {
 
     private func settingsLink(size: CGFloat) -> some View {
         Link(destination: URL(string: "googletvremote://settings")!) {
-            Image(systemName: "gearshape")
+            Image(systemName: "gearshape.2")
                 .font(.system(size: size * 0.55, weight: .semibold))
                 .frame(width: size, height: size)
                 .foregroundStyle(.secondary)
         }
-        .help("Settings")
+        .help("App settings")
     }
 
     // MARK: - Derived state
