@@ -7,6 +7,8 @@ A native SwiftUI menu bar app and interactive desktop widget for Google TV / And
 > running in OpenCode. Review the code before relying on it for anything
 > sensitive.
 
+**[Download the latest release →](https://github.com/frankt2012/MacDroidTV/releases/latest)**
+
 - Menu bar popover with a full remote: D-pad, OK, back, home, menu, TV, settings,
   volume, mute, power, and media transport keys.
 - Small and medium widgets with a working D-pad, volume, mute, power, and live
