@@ -12,6 +12,16 @@ A native SwiftUI menu bar app and interactive desktop widget for Google TV / And
 - Pairing certificate and TV list are shared between the app and widget through
   a macOS App Group container.
 
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/panel.png" width="320" alt="MacDroid TV menu bar remote">
+  <img src="docs/screenshots/widget.png" width="480" alt="MacDroid TV desktop widget">
+</p>
+<p align="center">
+  <img src="docs/screenshots/settings.png" width="340" alt="MacDroid TV settings">
+</p>
+
 ## Requirements
 
 - macOS 14 Sonoma or later
@@ -183,3 +193,7 @@ estimate.
   not work in Xcode Previews.
 - This is a personal-use project, not an App Store submission. Hardened runtime
   is disabled and the app is signed for local development.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
