@@ -39,6 +39,15 @@ A native SwiftUI menu bar app and interactive desktop widget for Google TV / And
 - Xcode 16 or later (Swift 5.9)
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`)
 
+## Homebrew
+
+```sh
+brew tap frankt2012/macdroidtv
+brew install --cask macdroidtv
+```
+
+The cask is in [frankt2012/homebrew-macdroidtv](https://github.com/frankt2012/homebrew-macdroidtv). This is a custom tap; the app is not yet in the official Homebrew Cask catalog.
+
 ## Build and install
 
 ```sh
