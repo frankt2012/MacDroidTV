@@ -20,7 +20,11 @@ public struct QuickApp: Identifiable, Hashable, Codable, Sendable {
     /// Asset-catalog name for the app's logo, when one is bundled.
     public var logoName: String? {
         switch id {
-        case "netflix", "youtube", "primevideo", "disneyplus", "max",
+        case "max":
+            // Distinct asset name from the old white-ring icon, so macOS does
+            // not keep showing a cached rendition.
+            return "AppLogo_maxbw"
+        case "netflix", "youtube", "primevideo", "disneyplus",
              "plex", "spotify", "appletv", "youtubetv":
             return "AppLogo_\(id)"
         default:
