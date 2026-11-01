@@ -104,7 +104,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             image.isTemplate = false
             return image
         }
-        if let url = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
+        if let url = Bundle.main.url(forResource: "MacDroidIcon", withExtension: "icns"),
            let image = NSImage(contentsOf: url) {
             image.size = NSSize(width: 22, height: 22)
             image.isTemplate = false
