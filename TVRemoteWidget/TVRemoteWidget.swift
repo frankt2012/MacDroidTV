@@ -58,14 +58,21 @@ struct TVRemoteWidgetEntryView: View {
         }
         .containerBackground(for: .widget) {
             ZStack {
+                // A material keeps the widget glassy; the tint overlay is what
+                // the opacity setting controls, so lowering it reveals more of
+                // the desktop instead of just changing a flat color.
+                Rectangle().fill(.ultraThinMaterial)
                 Color(nsColor: .windowBackgroundColor)
+                    .opacity(0.55 * entry.snapshot.widgetOpacity)
                 LinearGradient(
-                    colors: [Color.accentColor.opacity(0.18), Color.clear],
+                    colors: [
+                        Color.accentColor.opacity(0.18 * entry.snapshot.widgetOpacity),
+                        Color.clear
+                    ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
             }
-            .opacity(entry.snapshot.widgetOpacity)
         }
     }
 

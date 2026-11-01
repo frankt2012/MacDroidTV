@@ -25,7 +25,7 @@ struct SettingsView: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         HStack {
-                            Text("Widget background opacity")
+                            Text("Widget background tint")
                             Spacer()
                             Text("\(Int((model.widgetOpacity * 100).rounded()))%")
                                 .monospacedDigit()
@@ -38,6 +38,9 @@ struct SettingsView: View {
                             ),
                             in: 0.1...1.0
                         )
+                        Text("Lower values let more of the desktop show through the glass.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     }
 
                     Divider()
