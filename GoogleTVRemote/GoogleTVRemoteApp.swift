@@ -5,6 +5,7 @@ import WidgetKit
 
 @main
 struct GoogleTVRemoteApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var model: AppModel
 
     init() {

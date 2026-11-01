@@ -1,4 +1,5 @@
 import AppKit
+import Foundation
 import SwiftUI
 import TVRemoteKit
 import WidgetKit
@@ -88,6 +89,7 @@ struct TVRemoteWidgetEntryView: View {
                 key(.back, "arrow.uturn.backward", size: 20)
                 key(.home, "house", size: 20)
                 Spacer(minLength: 0)
+                syncLink(size: 20)
                 Text(volumeText)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -116,6 +118,8 @@ struct TVRemoteWidgetEntryView: View {
                     Text(volumeText)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
+                    Spacer(minLength: 0)
+                    syncLink(size: 24)
                 }
 
                 HStack(spacing: 10) {
@@ -202,6 +206,17 @@ struct TVRemoteWidgetEntryView: View {
                 .background(Circle().fill(Color.primary.opacity(0.08)))
         }
         .buttonStyle(.plain)
+    }
+
+    /// Opens the menu bar app's volume calibration window.
+    private func syncLink(size: CGFloat) -> some View {
+        Link(destination: URL(string: "googletvremote://volume-sync")!) {
+            Image(systemName: "slider.horizontal.3")
+                .font(.system(size: size * 0.40, weight: .semibold))
+                .frame(width: size, height: size)
+                .background(Circle().fill(Color.primary.opacity(0.08)))
+        }
+        .help("Sync volume")
     }
 
     // MARK: - Derived state

@@ -291,6 +291,7 @@ struct RemotePanelView: View {
 
 struct VolumeSyncView: View {
     @Bindable var model: AppModel
+    var onFinish: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
 
     @State private var level: Int = 50
@@ -330,12 +331,16 @@ struct VolumeSyncView: View {
             }
 
             HStack {
-                Button("Cancel") { dismiss() }
-                    .keyboardShortcut(.cancelAction)
+                Button("Cancel") {
+                    dismiss()
+                    onFinish?()
+                }
+                .keyboardShortcut(.cancelAction)
                 Spacer()
                 Button("Sync") {
                     model.syncVolume(level: level, step: step)
                     dismiss()
+                    onFinish?()
                 }
                 .keyboardShortcut(.defaultAction)
             }

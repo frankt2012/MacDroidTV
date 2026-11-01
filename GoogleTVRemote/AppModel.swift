@@ -8,6 +8,10 @@ import WidgetKit
 @MainActor
 @Observable
 final class AppModel {
+    /// The menu bar app's live model, used by the URL handler that opens the
+    /// volume sync window from the widget.
+    @MainActor static weak var shared: AppModel?
+
     enum Status: Equatable {
         case idle
         case connecting
@@ -97,6 +101,8 @@ final class AppModel {
         Task { [weak self] in
             await self?.connectToActiveDeviceIfNeeded()
         }
+
+        Self.shared = self
     }
 
     deinit {
