@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import TVRemoteKit
 
 /// Handles widget links that open small utility windows. The menu bar app has
 /// no normal window, so this is how the widget reaches calibration and
@@ -8,6 +9,87 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var syncWindow: NSWindow?
     private var settingsWindow: NSWindow?
+    private var statusItem: NSStatusItem?
+    private var popover: NSPopover?
+    private var defaultsObserver: NSObjectProtocol?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        setupStatusItem()
+    }
+
+    /// SwiftUI's MenuBarExtra proved unreliable on cold launch, so the status
+    /// item is owned directly. The popover hosts the same remote panel.
+    private func setupStatusItem() {
+        guard let model = AppModel.shared else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.setupStatusItem()
+            }
+            return
+        }
+
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        if let button = item.button {
+            let image = NSImage(
+                systemSymbolName: "tv",
+                accessibilityDescription: "Google TV Remote"
+            )
+            image?.isTemplate = true
+            button.image = image
+            button.target = self
+            button.action = #selector(togglePopover(_:))
+        }
+
+        let hosting = NSHostingController(rootView: RemotePanelView(model: model))
+        hosting.view.layoutSubtreeIfNeeded()
+        let popover = NSPopover()
+        popover.behavior = .transient
+        popover.contentViewController = hosting
+        let fitting = hosting.view.fittingSize
+        popover.contentSize = fitting.width > 0 && fitting.height > 0
+            ? fitting
+            : NSSize(width: 340, height: 620)
+
+        statusItem = item
+        self.popover = popover
+
+        applyMenuBarVisibility()
+        defaultsObserver = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.applyMenuBarVisibility()
+        }
+    }
+
+    private func applyMenuBarVisibility() {
+        let visible = UserDefaults.standard.object(forKey: "showMenuBarIcon") as? Bool ?? true
+        statusItem?.isVisible = visible
+    }
+
+    @objc private func togglePopover(_ sender: Any?) {
+        guard let statusItem, let button = statusItem.button, let popover else { return }
+
+        if popover.isShown {
+            popover.performClose(sender)
+            return
+        }
+
+        if let model = AppModel.shared {
+            let name = model.isConnected ? "tv.fill" : "tv"
+            let image = NSImage(systemSymbolName: name, accessibilityDescription: "Google TV Remote")
+            image?.isTemplate = true
+            button.image = image
+        }
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        // Widget-only mode hides the status item; the app must stay alive so
+        // the widget can keep using its connection.
+        false
+    }
 
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls where url.scheme == "googletvremote" {
@@ -16,6 +98,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 withModel { [weak self] model in self?.showVolumeSync(model) }
             case "settings":
                 withModel { [weak self] model in self?.showSettings(model: model) }
+            case "panel":
+                withModel { [weak self] _ in self?.togglePopover(nil) }
             default:
                 break
             }

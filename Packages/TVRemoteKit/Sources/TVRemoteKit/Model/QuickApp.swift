@@ -21,11 +21,11 @@ public struct QuickApp: Identifiable, Hashable, Codable, Sendable {
     public var logoName: String? {
         switch id {
         case "max":
-            // Distinct asset name from the old white-ring icon, so macOS does
-            // not keep showing a cached rendition.
             return "AppLogo_maxbw"
+        case "youtubetv":
+            return "AppLogo_youtubetv"
         case "netflix", "youtube", "primevideo", "disneyplus",
-             "plex", "spotify", "appletv", "youtubetv":
+             "plex", "spotify", "appletv":
             return "AppLogo_\(id)"
         default:
             return nil

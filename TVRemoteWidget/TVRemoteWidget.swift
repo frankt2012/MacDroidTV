@@ -233,60 +233,13 @@ struct TVRemoteWidgetEntryView: View {
     /// Opens a streaming app through its Android TV deep link.
     private func appButton(_ app: QuickApp, size: CGFloat) -> some View {
         Button(intent: RemoteAppLinkIntent(link: app.link, appName: app.name)) {
-            Group {
-                if let logo = app.logoName {
-                    logoImage(logo, size: size)
-                } else {
-                    Text(app.shortLabel)
-                        .font(.system(size: size * 0.38, weight: .bold))
-                        .frame(width: size, height: size)
-                        .background(
-                            RoundedRectangle(cornerRadius: size * 0.28)
-                                .fill(appTint(app).opacity(0.18))
-                        )
-                        .foregroundStyle(appTint(app))
-                }
-            }
-            .frame(width: size, height: size)
+            QuickAppBadge(app: app, size: size)
         }
         .buttonStyle(.plain)
         .help("Open \(app.name)")
     }
 
-    /// Widgets render in an accented/monochrome mode when the desktop is
-    /// active; opt the brand logos back into full color.
-    @ViewBuilder
-    private func logoImage(_ name: String, size: CGFloat) -> some View {
-        if #available(macOS 15.0, *) {
-            Image(name)
-                .resizable()
-                .interpolation(.high)
-                .widgetAccentedRenderingMode(.fullColor)
-                .scaledToFit()
-                .frame(width: size, height: size)
-                .clipShape(RoundedRectangle(cornerRadius: size * 0.22))
-        } else {
-            Image(name)
-                .resizable()
-                .interpolation(.high)
-                .scaledToFit()
-                .frame(width: size, height: size)
-                .clipShape(RoundedRectangle(cornerRadius: size * 0.22))
-        }
-    }
-
-    private func appTint(_ app: QuickApp) -> Color {
-        switch app.id {
-        case "netflix", "youtube", "youtubetv": return .red
-        case "primevideo", "disneyplus": return .blue
-        case "hulu": return .green
-        case "max": return .purple
-        case "plex": return .orange
-        case "spotify": return Color(red: 0.1, green: 0.7, blue: 0.3)
-        default: return .gray
-        }
-    }
-
+    /// Opens the app's settings window.
     /// Re-reads the TV's power and volume state.
     private func refreshButton(size: CGFloat) -> some View {
         Button(intent: RefreshTVStateIntent()) {
@@ -299,7 +252,6 @@ struct TVRemoteWidgetEntryView: View {
         .help("Refresh TV status")
     }
 
-    /// Opens the app's settings window.
     private func settingsLink(size: CGFloat) -> some View {
         Link(destination: URL(string: "googletvremote://settings")!) {
             Image(systemName: "gearshape")

@@ -7,8 +7,6 @@ import WidgetKit
 struct GoogleTVRemoteApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var model: AppModel
-    /// Menu bar control can be hidden for a widget-only setup.
-    @AppStorage("showMenuBarIcon") private var showMenuBarIcon = true
 
     init() {
         if CommandLine.arguments.contains("--touch-state") {
@@ -144,6 +142,7 @@ struct GoogleTVRemoteApp: App {
             print("customApps=\(state.customApps?.map(\.name).joined(separator: ",") ?? "nil")")
             print("cacheUpdatedAt=\(state.cache.updatedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "nil")")
             print("lastSaveError=\(store.lastSaveError ?? "nil")")
+            print("showMenuBarIcon=\(UserDefaults.standard.object(forKey: "showMenuBarIcon").map { "\($0)" } ?? "nil")")
             print("hostName=\(Host.current().localizedName ?? "nil")")
             print("--- debug.log tail ---")
             for line in store.debugLogTail(maxLines: 80) {
@@ -230,6 +229,13 @@ struct GoogleTVRemoteApp: App {
 
         _model = State(initialValue: AppModel())
 
+        if let index = CommandLine.arguments.firstIndex(of: "--set-menu-bar") {
+            let value = CommandLine.arguments.dropFirst(index + 1).first != "0"
+            UserDefaults.standard.set(value, forKey: "showMenuBarIcon")
+            print("showMenuBarIcon=\(value)")
+            exit(0)
+        }
+
         if CommandLine.arguments.contains("--reset-apps") {
             let model = _model.wrappedValue
             Task { @MainActor in
@@ -306,15 +312,11 @@ struct GoogleTVRemoteApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra(isInserted: $showMenuBarIcon) {
-            RemotePanelView(model: model)
-        } label: {
-            Label(
-                "Google TV Remote",
-                systemImage: model.isConnected ? "av.remote.fill" : "av.remote"
-            )
+        // The status item is owned by AppDelegate so it is inserted reliably
+        // on a cold launch. An empty Settings scene keeps SwiftUI happy.
+        Settings {
+            EmptyView()
         }
-        .menuBarExtraStyle(.window)
     }
 }
 
