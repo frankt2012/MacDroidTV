@@ -334,7 +334,7 @@ private struct WidgetVolumeBar: View {
 }
 
 struct TVRemoteWidget: Widget {
-    let kind = "TVRemoteWidget"
+    let kind = "MacDroidTVWidget"
 
     var body: some WidgetConfiguration {
         AppIntentConfiguration(
