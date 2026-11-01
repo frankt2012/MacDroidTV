@@ -7,9 +7,13 @@ import WidgetKit
 struct TVRemoteEntry: TimelineEntry {
     let date: Date
     let snapshot: WidgetSnapshot
+    let deviceID: UUID?
 }
 
-struct TVRemoteProvider: TimelineProvider {
+struct TVRemoteProvider: AppIntentTimelineProvider {
+    typealias Entry = TVRemoteEntry
+    typealias Intent = TVWidgetConfigurationIntent
+
     func placeholder(in context: Context) -> TVRemoteEntry {
         TVRemoteEntry(
             date: Date(),
@@ -21,24 +25,30 @@ struct TVRemoteProvider: TimelineProvider {
                 volumeMax: 100,
                 muted: false,
                 updatedAt: Date()
-            )
+            ),
+            deviceID: nil
         )
     }
 
-    func getSnapshot(in context: Context, completion: @escaping (TVRemoteEntry) -> Void) {
-        completion(makeEntry())
+    func snapshot(for configuration: TVWidgetConfigurationIntent, in context: Context) async -> TVRemoteEntry {
+        makeEntry(configuration)
     }
 
-    func getTimeline(in context: Context, completion: @escaping (Timeline<TVRemoteEntry>) -> Void) {
-        let entry = makeEntry()
+    func timeline(for configuration: TVWidgetConfigurationIntent, in context: Context) async -> Timeline<TVRemoteEntry> {
+        let entry = makeEntry(configuration)
         let next = Calendar.current.date(byAdding: .minute, value: 15, to: Date())
             ?? Date().addingTimeInterval(15 * 60)
-        completion(Timeline(entries: [entry], policy: .after(next)))
+        return Timeline(entries: [entry], policy: .after(next))
     }
 
-    private func makeEntry() -> TVRemoteEntry {
+    private func makeEntry(_ configuration: TVWidgetConfigurationIntent) -> TVRemoteEntry {
         SharedStore.shared.invalidateCache()
-        return TVRemoteEntry(date: Date(), snapshot: WidgetSnapshot.load())
+        let id = configuration.device.flatMap { UUID(uuidString: $0.id) }
+        return TVRemoteEntry(
+            date: Date(),
+            snapshot: WidgetSnapshot.load(deviceID: id),
+            deviceID: id
+        )
     }
 }
 
@@ -189,7 +199,7 @@ struct TVRemoteWidgetEntryView: View {
             refreshButton(size: compact ? 16 : 18)
             settingsLink(size: compact ? 16 : 18)
 
-            Button(intent: RemoteKeyIntent(key: .power)) {
+            Button(intent: RemoteKeyIntent(key: .power, deviceID: entry.deviceID)) {
                 Image(systemName: "power")
                     .font(.system(size: (compact ? 20 : 24) * 0.42, weight: .bold))
                     .frame(width: compact ? 20 : 24, height: compact ? 20 : 24)
@@ -211,7 +221,7 @@ struct TVRemoteWidgetEntryView: View {
             key(.up, "chevron.up", size: buttonSize)
             HStack(spacing: 3) {
                 key(.left, "chevron.left", size: buttonSize)
-                Button(intent: RemoteKeyIntent(key: .select)) {
+                Button(intent: RemoteKeyIntent(key: .select, deviceID: entry.deviceID)) {
                     Text("OK")
                         .font(.system(size: buttonSize * 0.30, weight: .bold))
                         .frame(width: buttonSize, height: buttonSize)
@@ -225,7 +235,7 @@ struct TVRemoteWidgetEntryView: View {
     }
 
     private func key(_ key: RemoteKey, _ symbol: String, size: CGFloat) -> some View {
-        Button(intent: RemoteKeyIntent(key: key)) {
+        Button(intent: RemoteKeyIntent(key: key, deviceID: entry.deviceID)) {
             Image(systemName: symbol)
                 .font(.system(size: size * 0.44, weight: .semibold))
                 .frame(width: size, height: size)
@@ -247,7 +257,7 @@ struct TVRemoteWidgetEntryView: View {
 
     /// Opens a streaming app through its Android TV deep link.
     private func appButton(_ app: QuickApp, size: CGFloat) -> some View {
-        Button(intent: RemoteAppLinkIntent(link: app.link, appName: app.name)) {
+        Button(intent: RemoteAppLinkIntent(link: app.link, appName: app.name, deviceID: entry.deviceID)) {
             QuickAppBadge(app: app, size: size)
         }
         .buttonStyle(.plain)
@@ -257,7 +267,7 @@ struct TVRemoteWidgetEntryView: View {
     /// Opens the app's settings window.
     /// Re-reads the TV's power and volume state.
     private func refreshButton(size: CGFloat) -> some View {
-        Button(intent: RefreshTVStateIntent()) {
+        Button(intent: RefreshTVStateIntent(deviceID: entry.deviceID)) {
             Image(systemName: "arrow.clockwise")
                 .font(.system(size: size * 0.55, weight: .semibold))
                 .frame(width: size, height: size)
@@ -327,7 +337,11 @@ struct TVRemoteWidget: Widget {
     let kind = "TVRemoteWidget"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: TVRemoteProvider()) { entry in
+        AppIntentConfiguration(
+            kind: kind,
+            intent: TVWidgetConfigurationIntent.self,
+            provider: TVRemoteProvider()
+        ) { entry in
             TVRemoteWidgetEntryView(entry: entry)
         }
         .configurationDisplayName("MacDroid TV")

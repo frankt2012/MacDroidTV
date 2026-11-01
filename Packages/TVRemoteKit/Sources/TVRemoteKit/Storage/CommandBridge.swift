@@ -12,29 +12,34 @@ public struct RemoteCommand: Codable, Sendable {
     public let link: String?
     /// Re-read the TV's power/volume state.
     public let refresh: Bool?
+    /// Which paired TV to target; nil means the active TV.
+    public let deviceID: String?
     public let createdAt: Date
 
-    public init(id: UUID = UUID(), key: RemoteKey, createdAt: Date = Date()) {
+    public init(id: UUID = UUID(), key: RemoteKey, deviceID: UUID? = nil, createdAt: Date = Date()) {
         self.id = id
         self.key = key.rawValue
         self.link = nil
         self.refresh = nil
+        self.deviceID = deviceID?.uuidString
         self.createdAt = createdAt
     }
 
-    public init(id: UUID = UUID(), link: String, createdAt: Date = Date()) {
+    public init(id: UUID = UUID(), link: String, deviceID: UUID? = nil, createdAt: Date = Date()) {
         self.id = id
         self.key = nil
         self.link = link
         self.refresh = nil
+        self.deviceID = deviceID?.uuidString
         self.createdAt = createdAt
     }
 
-    public init(id: UUID = UUID(), refresh: Bool, createdAt: Date = Date()) {
+    public init(id: UUID = UUID(), refresh: Bool, deviceID: UUID? = nil, createdAt: Date = Date()) {
         self.id = id
         self.key = nil
         self.link = nil
         self.refresh = refresh
+        self.deviceID = deviceID?.uuidString
         self.createdAt = createdAt
     }
 }
@@ -51,18 +56,18 @@ public enum CommandBridge {
     private static var resultURL: URL? { directory?.appendingPathComponent("command-result.json") }
 
     @discardableResult
-    public static func post(_ key: RemoteKey) -> UUID {
-        post(RemoteCommand(key: key))
+    public static func post(_ key: RemoteKey, deviceID: UUID? = nil) -> UUID {
+        post(RemoteCommand(key: key, deviceID: deviceID))
     }
 
     @discardableResult
-    public static func post(link: String) -> UUID {
-        post(RemoteCommand(link: link))
+    public static func post(link: String, deviceID: UUID? = nil) -> UUID {
+        post(RemoteCommand(link: link, deviceID: deviceID))
     }
 
     @discardableResult
-    public static func postRefresh() -> UUID {
-        post(RemoteCommand(refresh: true))
+    public static func postRefresh(deviceID: UUID? = nil) -> UUID {
+        post(RemoteCommand(refresh: true, deviceID: deviceID))
     }
 
     private static func post(_ command: RemoteCommand) -> UUID {

@@ -103,6 +103,8 @@ public struct RemoteState: Codable, Equatable, Sendable {
     public var quickAppIDs: [String]?
     /// User-defined app shortcuts.
     public var customApps: [QuickApp]?
+    /// Cached power/volume per paired TV, keyed by UUID string.
+    public var deviceStates: [String: CachedTVState]?
 
     public init(
         identity: StoredIdentity? = nil,
@@ -111,7 +113,8 @@ public struct RemoteState: Codable, Equatable, Sendable {
         cache: CachedTVState = CachedTVState(),
         clientName: String = "Mac Remote",
         quickAppIDs: [String]? = nil,
-        customApps: [QuickApp]? = nil
+        customApps: [QuickApp]? = nil,
+        deviceStates: [String: CachedTVState]? = nil
     ) {
         self.identity = identity
         self.devices = devices
@@ -120,6 +123,22 @@ public struct RemoteState: Codable, Equatable, Sendable {
         self.clientName = clientName
         self.quickAppIDs = quickAppIDs
         self.customApps = customApps
+        self.deviceStates = deviceStates
+    }
+
+    /// Cached state for a specific TV. The active TV uses `cache`; others use
+    /// the per-device dictionary.
+    public func cache(for deviceID: UUID?) -> CachedTVState {
+        guard let deviceID else { return cache }
+        if deviceID == activeDeviceID { return cache }
+        return deviceStates?[deviceID.uuidString] ?? CachedTVState()
+    }
+
+    public mutating func setCache(_ value: CachedTVState, for deviceID: UUID?) {
+        guard let deviceID else { cache = value; return }
+        if deviceID == activeDeviceID { cache = value }
+        if deviceStates == nil { deviceStates = [:] }
+        deviceStates?[deviceID.uuidString] = value
     }
 
     /// Every app the settings UI can offer.
@@ -200,18 +219,23 @@ public struct WidgetSnapshot: Equatable, Sendable {
         self.quickApps = quickApps
     }
 
-    public static func load(from store: SharedStore = .shared) -> WidgetSnapshot {
+    public static func load(
+        from store: SharedStore = .shared,
+        deviceID: UUID? = nil
+    ) -> WidgetSnapshot {
         let state = store.load()
-        let device = state.activeDevice
+        let device = deviceID.flatMap { id in state.devices.first { $0.id == id } }
+            ?? state.activeDevice
+        let cache = device.map { state.cache(for: $0.id) } ?? state.cache
         return WidgetSnapshot(
             isPaired: device != nil && state.identity != nil,
             deviceName: device?.name ?? "Google TV",
-            isOn: state.cache.isOn,
-            volume: state.cache.volume,
-            volumeMax: state.cache.volumeMax,
-            muted: state.cache.muted,
-            updatedAt: state.cache.updatedAt,
-            volumeEstimated: state.cache.volumeEstimated ?? false,
+            isOn: cache.isOn,
+            volume: cache.volume,
+            volumeMax: cache.volumeMax,
+            muted: cache.muted,
+            updatedAt: cache.updatedAt,
+            volumeEstimated: cache.volumeEstimated ?? false,
             quickApps: state.selectedQuickApps
         )
     }

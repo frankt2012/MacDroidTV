@@ -15,13 +15,15 @@ public actor WidgetRemote {
     private var connectionOpened: Date?
     private let discovery = TVDiscovery()
 
-    public func send(_ key: RemoteKey) async throws {
+    public func send(_ key: RemoteKey, deviceID: UUID? = nil) async throws {
         let state = store.load()
-        guard let device = state.activeDevice, let identity = state.identity else {
+        let resolved = deviceID.flatMap { id in state.devices.first { $0.id == id } }
+            ?? state.activeDevice
+        guard let device = resolved, let identity = state.identity else {
             throw TVConnectionError.notPaired
         }
 
-        let wasOff = !state.cache.isOn
+        let wasOff = !state.cache(for: device.id).isOn
         var sentWakePacket = false
         if key == .power, wasOff, let mac = device.wakeMAC, !mac.isEmpty {
             sentWakePacket = WakeOnLAN.send(mac: mac) > 0
@@ -77,36 +79,38 @@ public actor WidgetRemote {
         let volumeInfo = await connection.volumeInfo
 
         store.update { state in
-            state.cache.isOn = isOn
+            var cache = state.cache(for: device.id)
+            cache.isOn = isOn
             // A 0/0 report means the TV has no volume scale; do not let it
             // wipe a real or estimated value.
             if let volumeInfo, volumeInfo.max > 0 {
-                state.cache.volume = volumeInfo.level
-                state.cache.volumeMax = volumeInfo.max
-                state.cache.muted = volumeInfo.muted
-                state.cache.volumeEstimated = false
+                cache.volume = volumeInfo.level
+                cache.volumeMax = volumeInfo.max
+                cache.muted = volumeInfo.muted
+                cache.volumeEstimated = false
             } else {
                 switch key {
                 case .volumeUp:
-                    if let level = state.cache.volume, let max = state.cache.volumeMax {
-                        let step = state.cache.volumeStep ?? Swift.max(1, max / 50)
-                        state.cache.volume = min(level + step, max)
-                        state.cache.volumeEstimated = true
+                    if let level = cache.volume, let max = cache.volumeMax {
+                        let step = cache.volumeStep ?? Swift.max(1, max / 50)
+                        cache.volume = min(level + step, max)
+                        cache.volumeEstimated = true
                     }
                 case .volumeDown:
-                    if let level = state.cache.volume, let max = state.cache.volumeMax {
-                        let step = state.cache.volumeStep ?? Swift.max(1, max / 50)
-                        state.cache.volume = Swift.max(level - step, 0)
-                        state.cache.volumeEstimated = true
+                    if let level = cache.volume, let max = cache.volumeMax {
+                        let step = cache.volumeStep ?? Swift.max(1, max / 50)
+                        cache.volume = Swift.max(level - step, 0)
+                        cache.volumeEstimated = true
                     }
                 case .mute:
-                    state.cache.muted.toggle()
-                    state.cache.volumeEstimated = true
+                    cache.muted.toggle()
+                    cache.volumeEstimated = true
                 default:
                     break
                 }
             }
-            state.cache.updatedAt = Date()
+            cache.updatedAt = Date()
+            state.setCache(cache, for: device.id)
         }
 
         if changesState {
@@ -115,18 +119,22 @@ public actor WidgetRemote {
     }
 
     /// Opens an app on the TV through its deep link.
-    public func sendAppLink(_ link: String) async throws {
+    public func sendAppLink(_ link: String, deviceID: UUID? = nil) async throws {
         let state = store.load()
-        guard let device = state.activeDevice, let identity = state.identity else {
+        let resolved = deviceID.flatMap { id in state.devices.first { $0.id == id } }
+            ?? state.activeDevice
+        guard let device = resolved, let identity = state.identity else {
             throw TVConnectionError.notPaired
         }
         let connection = try await openConnection(for: device, identity: identity)
         try await connection.sendAppLink(link)
     }
 
-    public func refresh() async throws {
+    public func refresh(deviceID: UUID? = nil) async throws {
         let state = store.load()
-        guard let device = state.activeDevice, let identity = state.identity else {
+        let resolved = deviceID.flatMap { id in state.devices.first { $0.id == id } }
+            ?? state.activeDevice
+        guard let device = resolved, let identity = state.identity else {
             return
         }
 
@@ -135,13 +143,16 @@ public actor WidgetRemote {
         let volumeInfo = await connection.volumeInfo
 
         store.update { state in
-            state.cache.isOn = isOn
-            if let volumeInfo {
-                state.cache.volume = volumeInfo.level
-                state.cache.volumeMax = volumeInfo.max
-                state.cache.muted = volumeInfo.muted
+            var cache = state.cache(for: device.id)
+            cache.isOn = isOn
+            if let volumeInfo, volumeInfo.max > 0 {
+                cache.volume = volumeInfo.level
+                cache.volumeMax = volumeInfo.max
+                cache.muted = volumeInfo.muted
+                cache.volumeEstimated = false
             }
-            state.cache.updatedAt = Date()
+            cache.updatedAt = Date()
+            state.setCache(cache, for: device.id)
         }
 
         WidgetCenter.shared.reloadAllTimelines()
@@ -238,10 +249,14 @@ public struct RemoteKeyIntent: AppIntent {
     @Parameter(title: "Key")
     public var key: String
 
+    @Parameter(title: "TV")
+    public var deviceID: String?
+
     public init() {}
 
-    public init(key: RemoteKey) {
+    public init(key: RemoteKey, deviceID: UUID? = nil) {
         self.key = key.rawValue
+        self.deviceID = deviceID?.uuidString
     }
 
     public func perform() async throws -> some IntentResult {
@@ -253,7 +268,7 @@ public struct RemoteKeyIntent: AppIntent {
         let appID = "com.franktriolo.googletvremote"
         let appRunning = !NSRunningApplication.runningApplications(withBundleIdentifier: appID).isEmpty
         if appRunning {
-            let id = CommandBridge.post(remoteKey)
+            let id = CommandBridge.post(remoteKey, deviceID: deviceID.flatMap(UUID.init(uuidString:)))
             // Waking the TV takes longer than a key press. Once the app has the
             // command, never fall back: sending the key twice would double a
             // D-pad move or toggle the TV back off.
@@ -269,7 +284,7 @@ public struct RemoteKeyIntent: AppIntent {
         }
 
         do {
-            try await WidgetRemote.shared.send(remoteKey)
+            try await WidgetRemote.shared.send(remoteKey, deviceID: deviceID.flatMap(UUID.init(uuidString:)))
         } catch {
             SharedStore.shared.appendDebugLog("[widget-intent] direct failed: \(error)")
         }
@@ -291,11 +306,15 @@ public struct RemoteAppLinkIntent: AppIntent {
     @Parameter(title: "App Name")
     public var appName: String
 
+    @Parameter(title: "TV")
+    public var deviceID: String?
+
     public init() {}
 
-    public init(link: String, appName: String) {
+    public init(link: String, appName: String, deviceID: UUID? = nil) {
         self.link = link
         self.appName = appName
+        self.deviceID = deviceID?.uuidString
     }
 
     public func perform() async throws -> some IntentResult {
@@ -303,7 +322,7 @@ public struct RemoteAppLinkIntent: AppIntent {
         let appID = "com.franktriolo.googletvremote"
         let appRunning = !NSRunningApplication.runningApplications(withBundleIdentifier: appID).isEmpty
         if appRunning {
-            let id = CommandBridge.post(link: link)
+            let id = CommandBridge.post(link: link, deviceID: deviceID.flatMap(UUID.init(uuidString:)))
             if let outcome = await CommandBridge.waitForResult(id: id, timeout: 10) {
                 if let error = outcome, !error.isEmpty {
                     SharedStore.shared.appendDebugLog("[widget-intent] app failed: \(error)")
@@ -315,7 +334,7 @@ public struct RemoteAppLinkIntent: AppIntent {
         }
 
         do {
-            try await WidgetRemote.shared.sendAppLink(link)
+            try await WidgetRemote.shared.sendAppLink(link, deviceID: deviceID.flatMap(UUID.init(uuidString:)))
         } catch {
             SharedStore.shared.appendDebugLog("[widget-intent] direct app link failed: \(error)")
         }
@@ -331,14 +350,21 @@ public struct RefreshTVStateIntent: AppIntent {
     @available(macOS 26.0, iOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *)
     public static var supportedModes: IntentModes { .background }
 
+    @Parameter(title: "TV")
+    public var deviceID: String?
+
     public init() {}
+
+    public init(deviceID: UUID? = nil) {
+        self.deviceID = deviceID?.uuidString
+    }
 
     public func perform() async throws -> some IntentResult {
         SharedStore.shared.appendDebugLog("[widget-intent] refresh")
         let appID = "com.franktriolo.googletvremote"
         let appRunning = !NSRunningApplication.runningApplications(withBundleIdentifier: appID).isEmpty
         if appRunning {
-            let id = CommandBridge.postRefresh()
+            let id = CommandBridge.postRefresh(deviceID: deviceID.flatMap(UUID.init(uuidString:)))
             if let outcome = await CommandBridge.waitForResult(id: id, timeout: 10) {
                 if let error = outcome, !error.isEmpty {
                     SharedStore.shared.appendDebugLog("[widget-intent] refresh failed: \(error)")
@@ -347,7 +373,7 @@ public struct RefreshTVStateIntent: AppIntent {
             return .result()
         }
 
-        try await WidgetRemote.shared.refresh()
+        try await WidgetRemote.shared.refresh(deviceID: deviceID.flatMap(UUID.init(uuidString:)))
         return .result()
     }
 }

@@ -87,12 +87,33 @@ final class AppModel {
                     // Ignore a command left over from a previous launch.
                     if Date().timeIntervalSince(command.createdAt) < 30 {
                         self.lastError = nil
-                        if let rawKey = command.key, let key = RemoteKey(rawValue: rawKey) {
-                            await self.performSend(key)
-                        } else if let link = command.link {
-                            await self.performAppLink(link)
-                        } else if command.refresh == true {
-                            await self.refreshNow()
+                        let targetID = command.deviceID.flatMap(UUID.init(uuidString:))
+                        let hasTarget = command.deviceID != nil
+                        let isActive = !hasTarget
+                            || (targetID != nil && targetID == self.state.activeDeviceID)
+                        if isActive {
+                            if let rawKey = command.key, let key = RemoteKey(rawValue: rawKey) {
+                                await self.performSend(key)
+                            } else if let link = command.link {
+                                await self.performAppLink(link)
+                            } else if command.refresh == true {
+                                await self.refreshNow()
+                            }
+                        } else if let targetID {
+                            // A widget can target a TV that is not the app's
+                            // active one; use a short-lived connection.
+                            do {
+                                if let rawKey = command.key, let key = RemoteKey(rawValue: rawKey) {
+                                    try await WidgetRemote.shared.send(key, deviceID: targetID)
+                                } else if let link = command.link {
+                                    try await WidgetRemote.shared.sendAppLink(link, deviceID: targetID)
+                                } else if command.refresh == true {
+                                    try await WidgetRemote.shared.refresh(deviceID: targetID)
+                                }
+                                self.state = self.store.load()
+                            } catch {
+                                self.lastError = error.localizedDescription
+                            }
                         }
                         CommandBridge.writeResult(id: command.id, error: self.lastError)
                     } else {
@@ -758,7 +779,13 @@ final class AppModel {
 
     private func mutateState(_ mutate: (inout RemoteState) -> Void) {
         let wasOn = state.cache.isOn
-        state = store.update(mutate)
+        state = store.update { state in
+            mutate(&state)
+            if let active = state.activeDeviceID {
+                if state.deviceStates == nil { state.deviceStates = [:] }
+                state.deviceStates?[active.uuidString] = state.cache
+            }
+        }
         if state.cache.isOn != wasOn {
             NotificationCenter.default.post(name: .tvPowerStateChanged, object: nil)
         }
@@ -769,7 +796,12 @@ final class AppModel {
 
     func select(_ device: PairedDevice) {
         mutateState { state in
+            if let old = state.activeDeviceID {
+                if state.deviceStates == nil { state.deviceStates = [:] }
+                state.deviceStates?[old.uuidString] = state.cache
+            }
             state.activeDeviceID = device.id
+            state.cache = state.deviceStates?[device.id.uuidString] ?? CachedTVState()
         }
         Task { [weak self] in
             await self?.connect(to: device)
