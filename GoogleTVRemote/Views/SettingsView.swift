@@ -7,6 +7,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
 
     @AppStorage("showMenuBarIcon") private var showMenuBarIcon = true
+    @AppStorage("showPowerDot") private var showPowerDot = true
     @State private var customName = ""
     @State private var customLink = ""
 
@@ -22,6 +23,11 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
+
+                    Toggle("Show TV power dot in the menu bar", isOn: $showPowerDot)
+                    Text("Green means the TV is on; red means it is off.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
 
                     Divider()
 

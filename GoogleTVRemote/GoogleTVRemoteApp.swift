@@ -236,6 +236,13 @@ struct GoogleTVRemoteApp: App {
             exit(0)
         }
 
+        if let index = CommandLine.arguments.firstIndex(of: "--set-power-dot") {
+            let value = CommandLine.arguments.dropFirst(index + 1).first != "0"
+            UserDefaults.standard.set(value, forKey: "showPowerDot")
+            print("showPowerDot=\(value)")
+            exit(0)
+        }
+
         if CommandLine.arguments.contains("--reset-apps") {
             let model = _model.wrappedValue
             Task { @MainActor in

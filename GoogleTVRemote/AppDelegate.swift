@@ -57,6 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             queue: .main
         ) { [weak self] _ in
             self?.applyMenuBarVisibility()
+            self?.updateStatusButton(isOn: AppModel.shared?.isOn ?? false)
         }
         powerObserver = NotificationCenter.default.addObserver(
             forName: .tvPowerStateChanged,
@@ -93,16 +94,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         return image
     }
 
-    /// Shows a green/red dot next to the remote icon for the TV's power state.
+    /// Shows a green/red dot next to the remote icon for the TV's power state,
+    /// when enabled in Settings.
     private func updateStatusButton(isOn: Bool) {
         guard let button = statusItem?.button else { return }
         button.image = makeStatusImage(filled: false)
-        button.imagePosition = .imageLeft
-        let dot = isOn ? " 🟢" : " 🔴"
-        button.attributedTitle = NSAttributedString(
-            string: dot,
-            attributes: [.font: NSFont.systemFont(ofSize: 10)]
-        )
+
+        let showDot = UserDefaults.standard.object(forKey: "showPowerDot") as? Bool ?? true
+        if showDot {
+            button.imagePosition = .imageLeft
+            let dot = isOn ? " 🟢" : " 🔴"
+            button.attributedTitle = NSAttributedString(
+                string: dot,
+                attributes: [.font: NSFont.systemFont(ofSize: 10)]
+            )
+        } else {
+            button.attributedTitle = NSAttributedString(string: "")
+            button.imagePosition = .imageOnly
+        }
     }
 
     @objc private func togglePopover(_ sender: Any?) {
