@@ -235,11 +235,7 @@ struct TVRemoteWidgetEntryView: View {
         Button(intent: RemoteAppLinkIntent(link: app.link, appName: app.name)) {
             Group {
                 if let logo = app.logoName {
-                    Image(logo)
-                        .resizable()
-                        .interpolation(.high)
-                        .scaledToFit()
-                        .clipShape(RoundedRectangle(cornerRadius: size * 0.22))
+                    logoImage(logo, size: size)
                 } else {
                     Text(app.shortLabel)
                         .font(.system(size: size * 0.38, weight: .bold))
@@ -255,6 +251,28 @@ struct TVRemoteWidgetEntryView: View {
         }
         .buttonStyle(.plain)
         .help("Open \(app.name)")
+    }
+
+    /// Widgets render in an accented/monochrome mode when the desktop is
+    /// active; opt the brand logos back into full color.
+    @ViewBuilder
+    private func logoImage(_ name: String, size: CGFloat) -> some View {
+        if #available(macOS 15.0, *) {
+            Image(name)
+                .resizable()
+                .interpolation(.high)
+                .widgetAccentedRenderingMode(.fullColor)
+                .scaledToFit()
+                .frame(width: size, height: size)
+                .clipShape(RoundedRectangle(cornerRadius: size * 0.22))
+        } else {
+            Image(name)
+                .resizable()
+                .interpolation(.high)
+                .scaledToFit()
+                .frame(width: size, height: size)
+                .clipShape(RoundedRectangle(cornerRadius: size * 0.22))
+        }
     }
 
     private func appTint(_ app: QuickApp) -> Color {

@@ -21,7 +21,7 @@ public struct QuickApp: Identifiable, Hashable, Codable, Sendable {
     public var logoName: String? {
         switch id {
         case "netflix", "youtube", "primevideo", "disneyplus", "max",
-             "plex", "spotify", "appletv":
+             "plex", "spotify", "appletv", "youtubetv":
             return "AppLogo_\(id)"
         default:
             return nil
