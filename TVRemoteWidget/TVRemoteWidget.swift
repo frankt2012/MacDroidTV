@@ -104,14 +104,9 @@ struct TVRemoteWidgetEntryView: View {
     }
 
     private var mediumLayout: some View {
-        HStack(alignment: .top, spacing: 14) {
-            VStack(alignment: .leading, spacing: 7) {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
                 header(compact: false)
-
-                Text(statusText)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
 
                 Spacer(minLength: 0)
 
@@ -134,15 +129,23 @@ struct TVRemoteWidgetEntryView: View {
                     key(.fastForward, "forward.fill", size: 22)
                 }
 
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
+                    ForEach(QuickApp.featured) { app in
+                        appButton(app, size: 24)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            VStack(spacing: 6) {
+                dpad(buttonSize: 31)
+
+                HStack(spacing: 8) {
                     key(.back, "arrow.uturn.backward", size: 24)
                     key(.home, "house", size: 24)
                     key(.menu, "list.bullet", size: 24)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            dpad(buttonSize: 31)
         }
     }
 
@@ -231,6 +234,34 @@ struct TVRemoteWidgetEntryView: View {
                 .background(Circle().fill(Color.primary.opacity(0.08)))
         }
         .help("Sync volume")
+    }
+
+    /// Opens a streaming app through its Android TV deep link.
+    private func appButton(_ app: QuickApp, size: CGFloat) -> some View {
+        Button(intent: RemoteAppLinkIntent(link: app.link, appName: app.name)) {
+            Text(app.shortLabel)
+                .font(.system(size: size * 0.38, weight: .bold))
+                .frame(width: size, height: size)
+                .background(
+                    RoundedRectangle(cornerRadius: size * 0.28)
+                        .fill(appTint(app).opacity(0.18))
+                )
+                .foregroundStyle(appTint(app))
+        }
+        .buttonStyle(.plain)
+        .help("Open \(app.name)")
+    }
+
+    private func appTint(_ app: QuickApp) -> Color {
+        switch app.id {
+        case "netflix", "youtube", "youtubetv": return .red
+        case "primevideo", "disneyplus": return .blue
+        case "hulu": return .green
+        case "max": return .purple
+        case "plex": return .orange
+        case "spotify": return Color(red: 0.1, green: 0.7, blue: 0.3)
+        default: return .gray
+        }
     }
 
     /// Opens the app's settings window.

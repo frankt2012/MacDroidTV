@@ -85,10 +85,13 @@ final class AppModel {
             while !Task.isCancelled {
                 if let self, let command = CommandBridge.takePending() {
                     // Ignore a command left over from a previous launch.
-                    if Date().timeIntervalSince(command.createdAt) < 30,
-                       let key = RemoteKey(rawValue: command.key) {
+                    if Date().timeIntervalSince(command.createdAt) < 30 {
                         self.lastError = nil
-                        await self.performSend(key)
+                        if let rawKey = command.key, let key = RemoteKey(rawValue: rawKey) {
+                            await self.performSend(key)
+                        } else if let link = command.link {
+                            await self.performAppLink(link)
+                        }
                         CommandBridge.writeResult(id: command.id, error: self.lastError)
                     } else {
                         CommandBridge.writeResult(id: command.id, error: "stale command")
@@ -358,6 +361,13 @@ final class AppModel {
         send(.power)
     }
 
+    /// Opens an app on the TV through its Android TV deep link.
+    func openApp(_ app: QuickApp) {
+        Task { [weak self] in
+            await self?.performAppLink(app.link)
+        }
+    }
+
     func refresh() {
         Task { [weak self] in
             guard let self else { return }
@@ -481,6 +491,23 @@ final class AppModel {
             if key == .mute {
                 mutateState { state in state.cache.muted.toggle() }
             }
+        } catch {
+            lastError = error.localizedDescription
+            status = .failed(error.localizedDescription)
+            self.connection = nil
+            connectionDeviceID = nil
+        }
+    }
+
+    /// Sends an app deep link over the live connection.
+    private func performAppLink(_ link: String) async {
+        if !state.cache.isOn {
+            await wake()
+            guard state.cache.isOn else { return }
+        }
+        guard let connection = await ensureConnection() else { return }
+        do {
+            try await connection.sendAppLink(link)
         } catch {
             lastError = error.localizedDescription
             status = .failed(error.localizedDescription)

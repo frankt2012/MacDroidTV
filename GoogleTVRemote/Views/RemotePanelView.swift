@@ -121,6 +121,7 @@ struct RemotePanelView: View {
             dpad
             volumeRow
             mediaRow
+            quickAppsRow
         }
     }
 
@@ -223,6 +224,40 @@ struct RemotePanelView: View {
         }
     }
 
+    private var quickAppsRow: some View {
+        HStack(spacing: 12) {
+            ForEach(QuickApp.featured) { app in
+                Button {
+                    model.openApp(app)
+                } label: {
+                    Text(app.shortLabel)
+                        .font(.system(size: 11, weight: .bold))
+                        .frame(width: 38, height: 28)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(appTint(app).opacity(0.18))
+                        )
+                        .foregroundStyle(appTint(app))
+                }
+                .buttonStyle(.plain)
+                .help("Open \(app.name)")
+            }
+        }
+        .padding(.top, 2)
+    }
+
+    private func appTint(_ app: QuickApp) -> Color {
+        switch app.id {
+        case "netflix", "youtube", "youtubetv": return .red
+        case "primevideo", "disneyplus": return .blue
+        case "hulu": return .green
+        case "max": return .purple
+        case "plex": return .orange
+        case "spotify": return Color(red: 0.1, green: 0.7, blue: 0.3)
+        default: return .gray
+        }
+    }
+
     private func keyButton(_ key: RemoteKey, _ symbol: String, size: CGFloat = 36) -> some View {
         RemoteKeyButton(key: key, systemImage: symbol, size: size) {
             model.send(key)
@@ -276,6 +311,15 @@ struct RemotePanelView: View {
             .help("Refresh TV status")
 
             Spacer()
+
+            Button {
+                if let url = URL(string: "googletvremote://settings") {
+                    NSWorkspace.shared.open(url)
+                }
+            } label: {
+                Image(systemName: "gearshape")
+            }
+            .help("Settings")
 
             Button("Quit") {
                 NSApp.terminate(nil)

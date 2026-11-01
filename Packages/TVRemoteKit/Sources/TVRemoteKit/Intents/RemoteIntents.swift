@@ -114,6 +114,16 @@ public actor WidgetRemote {
         }
     }
 
+    /// Opens an app on the TV through its deep link.
+    public func sendAppLink(_ link: String) async throws {
+        let state = store.load()
+        guard let device = state.activeDevice, let identity = state.identity else {
+            throw TVConnectionError.notPaired
+        }
+        let connection = try await openConnection(for: device, identity: identity)
+        try await connection.sendAppLink(link)
+    }
+
     public func refresh() async throws {
         let state = store.load()
         guard let device = state.activeDevice, let identity = state.identity else {
@@ -262,6 +272,52 @@ public struct RemoteKeyIntent: AppIntent {
             try await WidgetRemote.shared.send(remoteKey)
         } catch {
             SharedStore.shared.appendDebugLog("[widget-intent] direct failed: \(error)")
+        }
+        return .result()
+    }
+}
+
+/// Opens an app on the TV. Used by the quick app buttons.
+public struct RemoteAppLinkIntent: AppIntent {
+    public static var title: LocalizedStringResource = "Open TV App"
+    public static var description = IntentDescription("Opens a streaming app on your Google TV.")
+    public static var isDiscoverable: Bool = false
+    @available(macOS 26.0, iOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0, *)
+    public static var supportedModes: IntentModes { .background }
+
+    @Parameter(title: "Link")
+    public var link: String
+
+    @Parameter(title: "App Name")
+    public var appName: String
+
+    public init() {}
+
+    public init(link: String, appName: String) {
+        self.link = link
+        self.appName = appName
+    }
+
+    public func perform() async throws -> some IntentResult {
+        SharedStore.shared.appendDebugLog("[widget-intent] open app \(appName)")
+        let appID = "com.franktriolo.googletvremote"
+        let appRunning = !NSRunningApplication.runningApplications(withBundleIdentifier: appID).isEmpty
+        if appRunning {
+            let id = CommandBridge.post(link: link)
+            if let outcome = await CommandBridge.waitForResult(id: id, timeout: 10) {
+                if let error = outcome, !error.isEmpty {
+                    SharedStore.shared.appendDebugLog("[widget-intent] app failed: \(error)")
+                }
+            } else {
+                SharedStore.shared.appendDebugLog("[widget-intent] app did not answer")
+            }
+            return .result()
+        }
+
+        do {
+            try await WidgetRemote.shared.sendAppLink(link)
+        } catch {
+            SharedStore.shared.appendDebugLog("[widget-intent] direct app link failed: \(error)")
         }
         return .result()
     }

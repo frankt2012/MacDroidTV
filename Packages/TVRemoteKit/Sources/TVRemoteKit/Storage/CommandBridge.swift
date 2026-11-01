@@ -6,20 +6,31 @@ import Foundation
 /// the race with the app's session.
 public struct RemoteCommand: Codable, Sendable {
     public let id: UUID
-    public let key: String
+    /// A remote key press, or nil when this command opens an app.
+    public let key: String?
+    /// An app deep link, or nil when this command sends a key.
+    public let link: String?
     public let createdAt: Date
 
     public init(id: UUID = UUID(), key: RemoteKey, createdAt: Date = Date()) {
         self.id = id
         self.key = key.rawValue
+        self.link = nil
+        self.createdAt = createdAt
+    }
+
+    public init(id: UUID = UUID(), link: String, createdAt: Date = Date()) {
+        self.id = id
+        self.key = nil
+        self.link = link
         self.createdAt = createdAt
     }
 }
 
-/// Hands widget key presses to the running menu bar app through the shared App
-/// Group container, with a distributed notification as the wake signal.
+/// Hands widget actions to the running menu bar app through the shared App
+/// Group container.
 ///
-/// The widget writes a command, the app reads it, sends the key on its live
+/// The widget writes a command, the app polls for it, performs it on its live
 /// connection, and writes a result file. The widget waits briefly for that
 /// result and falls back to its own connection if the app is not running.
 public enum CommandBridge {
@@ -29,7 +40,15 @@ public enum CommandBridge {
 
     @discardableResult
     public static func post(_ key: RemoteKey) -> UUID {
-        let command = RemoteCommand(key: key)
+        post(RemoteCommand(key: key))
+    }
+
+    @discardableResult
+    public static func post(link: String) -> UUID {
+        post(RemoteCommand(link: link))
+    }
+
+    private static func post(_ command: RemoteCommand) -> UUID {
         guard let commandURL else { return command.id }
         do {
             let data = try JSONEncoder().encode(command)

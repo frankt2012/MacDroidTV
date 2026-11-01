@@ -175,6 +175,26 @@ struct GoogleTVRemoteApp: App {
             exit(0)
         }
 
+        if let index = CommandLine.arguments.firstIndex(of: "--post-app") {
+            let raw = CommandLine.arguments.dropFirst(index + 1).first ?? "netflix"
+            guard let app = QuickApp.common.first(where: { $0.id == raw }) else {
+                print("unknown app \(raw). options: \(QuickApp.common.map(\.id).joined(separator: " "))")
+                exit(2)
+            }
+            let id = CommandBridge.post(link: app.link)
+            let sem = DispatchSemaphore(value: 0)
+            var message = "no response"
+            Task.detached {
+                if let outcome = await CommandBridge.waitForResult(id: id, timeout: 10) {
+                    message = outcome.flatMap { $0.isEmpty ? nil : $0 } ?? "ok"
+                }
+                sem.signal()
+            }
+            _ = sem.wait(timeout: .now() + 12)
+            print("post-app \(raw): \(message)")
+            exit(0)
+        }
+
         _model = State(initialValue: AppModel())
 
         #if DEBUG
