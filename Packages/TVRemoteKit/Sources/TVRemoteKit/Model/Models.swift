@@ -99,19 +99,39 @@ public struct RemoteState: Codable, Equatable, Sendable {
     public var activeDeviceID: UUID?
     public var cache: CachedTVState
     public var clientName: String
+    /// IDs of the quick app buttons to show. Nil means the default set.
+    public var quickAppIDs: [String]?
+    /// User-defined app shortcuts.
+    public var customApps: [QuickApp]?
 
     public init(
         identity: StoredIdentity? = nil,
         devices: [PairedDevice] = [],
         activeDeviceID: UUID? = nil,
         cache: CachedTVState = CachedTVState(),
-        clientName: String = "Mac Remote"
+        clientName: String = "Mac Remote",
+        quickAppIDs: [String]? = nil,
+        customApps: [QuickApp]? = nil
     ) {
         self.identity = identity
         self.devices = devices
         self.activeDeviceID = activeDeviceID
         self.cache = cache
         self.clientName = clientName
+        self.quickAppIDs = quickAppIDs
+        self.customApps = customApps
+    }
+
+    /// Every app the settings UI can offer.
+    public var allQuickApps: [QuickApp] {
+        QuickApp.common + (customApps ?? [])
+    }
+
+    /// The apps selected for the widget and panel, in user order.
+    public var selectedQuickApps: [QuickApp] {
+        guard let quickAppIDs else { return QuickApp.featured }
+        let all = allQuickApps
+        return quickAppIDs.compactMap { id in all.first { $0.id == id } }
     }
 
     public var activeDevice: PairedDevice? {
@@ -156,6 +176,7 @@ public struct WidgetSnapshot: Equatable, Sendable {
     public var muted: Bool
     public var updatedAt: Date?
     public var volumeEstimated: Bool
+    public var quickApps: [QuickApp]
 
     public init(
         isPaired: Bool,
@@ -165,7 +186,8 @@ public struct WidgetSnapshot: Equatable, Sendable {
         volumeMax: Int?,
         muted: Bool,
         updatedAt: Date?,
-        volumeEstimated: Bool = false
+        volumeEstimated: Bool = false,
+        quickApps: [QuickApp] = QuickApp.featured
     ) {
         self.isPaired = isPaired
         self.deviceName = deviceName
@@ -175,6 +197,7 @@ public struct WidgetSnapshot: Equatable, Sendable {
         self.muted = muted
         self.updatedAt = updatedAt
         self.volumeEstimated = volumeEstimated
+        self.quickApps = quickApps
     }
 
     public static func load(from store: SharedStore = .shared) -> WidgetSnapshot {
@@ -188,7 +211,8 @@ public struct WidgetSnapshot: Equatable, Sendable {
             volumeMax: state.cache.volumeMax,
             muted: state.cache.muted,
             updatedAt: state.cache.updatedAt,
-            volumeEstimated: state.cache.volumeEstimated ?? false
+            volumeEstimated: state.cache.volumeEstimated ?? false,
+            quickApps: state.selectedQuickApps
         )
     }
 }

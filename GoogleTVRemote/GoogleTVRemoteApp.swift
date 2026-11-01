@@ -140,6 +140,8 @@ struct GoogleTVRemoteApp: App {
             print("volumeMax=\(state.cache.volumeMax.map(String.init) ?? "nil")")
             print("muted=\(state.cache.muted)")
             print("volumeEstimated=\(state.cache.volumeEstimated.map(String.init) ?? "nil")")
+            print("quickApps=\(state.selectedQuickApps.map(\.id).joined(separator: ","))")
+            print("customApps=\(state.customApps?.map(\.name).joined(separator: ",") ?? "nil")")
             print("cacheUpdatedAt=\(state.cache.updatedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "nil")")
             print("lastSaveError=\(store.lastSaveError ?? "nil")")
             print("hostName=\(Host.current().localizedName ?? "nil")")
@@ -175,6 +177,22 @@ struct GoogleTVRemoteApp: App {
             exit(0)
         }
 
+        if let index = CommandLine.arguments.firstIndex(of: "--post-link") {
+            let link = CommandLine.arguments.dropFirst(index + 1).first ?? "market://launch?id=com.netflix.ninja"
+            let id = CommandBridge.post(link: link)
+            let sem = DispatchSemaphore(value: 0)
+            var message = "no response"
+            Task.detached {
+                if let outcome = await CommandBridge.waitForResult(id: id, timeout: 10) {
+                    message = outcome.flatMap { $0.isEmpty ? nil : $0 } ?? "ok"
+                }
+                sem.signal()
+            }
+            _ = sem.wait(timeout: .now() + 12)
+            print("post-link: \(message)")
+            exit(0)
+        }
+
         if let index = CommandLine.arguments.firstIndex(of: "--post-app") {
             let raw = CommandLine.arguments.dropFirst(index + 1).first ?? "netflix"
             guard let app = QuickApp.common.first(where: { $0.id == raw }) else {
@@ -196,6 +214,32 @@ struct GoogleTVRemoteApp: App {
         }
 
         _model = State(initialValue: AppModel())
+
+        if CommandLine.arguments.contains("--reset-apps") {
+            let model = _model.wrappedValue
+            Task { @MainActor in
+                await Task.yield()
+                model.resetQuickApps()
+                print("reset quick apps")
+                exit(0)
+            }
+        }
+
+        if let index = CommandLine.arguments.firstIndex(of: "--add-custom-app") {
+            let rest = Array(CommandLine.arguments.dropFirst(index + 1))
+            guard rest.count >= 2 else {
+                print("usage: --add-custom-app <name> <package-or-link>")
+                exit(2)
+            }
+            let model = _model.wrappedValue
+            Task { @MainActor in
+                await Task.yield()
+                model.addCustomQuickApp(name: rest[0], link: rest[1])
+                print("added \(rest[0])")
+                exit(0)
+            }
+        }
+
 
         #if DEBUG
         // Drives the real UI code path without clicking:

@@ -225,8 +225,11 @@ struct RemotePanelView: View {
     }
 
     private var quickAppsRow: some View {
-        HStack(spacing: 12) {
-            ForEach(QuickApp.featured) { app in
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 38), spacing: 10)],
+            spacing: 8
+        ) {
+            ForEach(model.selectedQuickApps) { app in
                 Button {
                     model.openApp(app)
                 } label: {

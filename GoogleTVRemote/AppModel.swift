@@ -163,6 +163,60 @@ final class AppModel {
         state.cache.volumeStep ?? max(1, volumeScaleMax / 50)
     }
 
+    var selectedQuickApps: [QuickApp] { state.selectedQuickApps }
+    var allQuickApps: [QuickApp] { state.allQuickApps }
+
+    func isQuickAppSelected(_ id: String) -> Bool {
+        selectedQuickApps.contains { $0.id == id }
+    }
+
+    func setQuickApp(id: String, selected: Bool) {
+        mutateState { state in
+            var ids = state.quickAppIDs ?? state.selectedQuickApps.map(\.id)
+            if selected {
+                if !ids.contains(id) { ids.append(id) }
+            } else {
+                ids.removeAll { $0 == id }
+            }
+            state.quickAppIDs = ids
+        }
+    }
+
+    func addCustomQuickApp(name: String, link: String) {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedLink = link.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty, !trimmedLink.isEmpty else { return }
+
+        let app = QuickApp(
+            id: "custom-\(UUID().uuidString)",
+            name: trimmedName,
+            shortLabel: String(trimmedName.prefix(2)).uppercased(),
+            link: QuickApp.launchLink(from: trimmedLink)
+        )
+        mutateState { state in
+            var customs = state.customApps ?? []
+            customs.append(app)
+            state.customApps = customs
+            var ids = state.quickAppIDs ?? state.selectedQuickApps.map(\.id)
+            ids.append(app.id)
+            state.quickAppIDs = ids
+        }
+    }
+
+    func resetQuickApps() {
+        mutateState { state in
+            state.quickAppIDs = nil
+            state.customApps = nil
+        }
+    }
+
+    func removeCustomQuickApp(id: String) {
+        mutateState { state in
+            state.customApps?.removeAll { $0.id == id }
+            state.quickAppIDs?.removeAll { $0 == id }
+        }
+    }
+
     func syncVolume(level: Int, step: Int) {
         mutateState { state in
             VolumeEstimate.sync(level: level, step: step, to: &state.cache)

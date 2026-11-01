@@ -1,9 +1,9 @@
 import Foundation
 
-/// A shortcut to open a streaming app on the TV through an Android TV app
-/// link. The links are the deep links Android TV apps register for; the TV
-/// routes them to the matching app instead of a browser.
-public struct QuickApp: Identifiable, Hashable, Sendable {
+/// A shortcut to open an app on the TV. Android TV exposes a universal launcher
+/// URI, `market://launch?id=<package>`, which opens any installed app without
+/// depending on that app supporting a deep link.
+public struct QuickApp: Identifiable, Hashable, Codable, Sendable {
     public let id: String
     public let name: String
     /// Short monogram shown on compact buttons (SF Symbols have no brand logos).
@@ -17,21 +17,31 @@ public struct QuickApp: Identifiable, Hashable, Sendable {
         self.link = link
     }
 
+    /// Turns a package name or a full URI into a launch link.
+    public static func launchLink(from input: String) -> String {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.contains("://") { return trimmed }
+        return "market://launch?id=\(trimmed)"
+    }
+
+    private static func app(_ id: String, _ name: String, _ label: String, _ package: String) -> QuickApp {
+        QuickApp(id: id, name: name, shortLabel: label, link: launchLink(from: package))
+    }
+
     /// The services that show up as dedicated buttons on most Google TV
     /// remotes, plus the most-used installed apps.
     public static let common: [QuickApp] = [
-        QuickApp(id: "netflix", name: "Netflix", shortLabel: "N", link: "https://www.netflix.com/title"),
-        QuickApp(id: "youtube", name: "YouTube", shortLabel: "YT", link: "https://www.youtube.com"),
-        QuickApp(id: "primevideo", name: "Prime Video", shortLabel: "P", link: "https://app.primevideo.com"),
-        QuickApp(id: "disneyplus", name: "Disney+", shortLabel: "D+", link: "https://www.disneyplus.com"),
-        QuickApp(id: "hulu", name: "Hulu", shortLabel: "H", link: "https://www.hulu.com"),
-        QuickApp(id: "max", name: "Max", shortLabel: "Max", link: "https://www.max.com"),
-        QuickApp(id: "plex", name: "Plex", shortLabel: "Plex", link: "plex://"),
-        QuickApp(id: "youtubetv", name: "YouTube TV", shortLabel: "YTTV", link: "https://tv.youtube.com"),
-        QuickApp(id: "spotify", name: "Spotify", shortLabel: "S", link: "https://open.spotify.com"),
-        QuickApp(id: "appletv", name: "Apple TV", shortLabel: "TV", link: "https://tv.apple.com")
+        app("netflix", "Netflix", "N", "com.netflix.ninja"),
+        app("youtube", "YouTube", "YT", "com.google.android.youtube.tv"),
+        app("primevideo", "Prime Video", "P", "com.amazon.amazonvideo.livingroom"),
+        app("disneyplus", "Disney+", "D+", "com.disney.disneyplus"),
+        app("max", "Max", "Max", "com.wbd.stream"),
+        app("plex", "Plex", "Plex", "com.plexapp.android"),
+        app("youtubetv", "YouTube TV", "YTTV", "com.google.android.apps.youtube.unplugged"),
+        app("spotify", "Spotify", "S", "com.spotify.tv.android"),
+        app("appletv", "Apple TV", "TV", "com.apple.atve.androidtv.appletv")
     ]
 
-    /// A few apps that fit comfortably in the remote widget/panel.
+    /// The default selection when the user has not chosen anything yet.
     public static let featured: [QuickApp] = Array(common.prefix(6))
 }

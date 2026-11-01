@@ -15,7 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             case "volume-sync":
                 withModel { [weak self] model in self?.showVolumeSync(model) }
             case "settings":
-                withModel { [weak self] _ in self?.showSettings() }
+                withModel { [weak self] model in self?.showSettings(model: model) }
             default:
                 break
             }
@@ -25,8 +25,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// Double-clicking the app while the menu bar control is hidden should
     /// bring settings back, otherwise there would be no way to re-enable it.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !flag {
-            showSettings()
+        if !flag, let model = AppModel.shared {
+            showSettings(model: model)
         }
         return true
     }
@@ -61,7 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         syncWindow = window
     }
 
-    private func showSettings() {
+    private func showSettings(model: AppModel) {
         if let settingsWindow {
             settingsWindow.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
@@ -70,8 +70,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         let window = makeWindow(
             title: "Settings",
-            size: NSSize(width: 320, height: 220),
-            content: SettingsView { [weak self] in
+            size: NSSize(width: 380, height: 600),
+            content: SettingsView(model: model) { [weak self] in
                 self?.settingsWindow?.close()
             }
         )

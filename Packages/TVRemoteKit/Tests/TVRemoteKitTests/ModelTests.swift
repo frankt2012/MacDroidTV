@@ -138,3 +138,43 @@ final class WakeOnLANTests: XCTestCase {
         XCTAssertNil(WakeOnLAN.magicPacket(for: "not-a-mac"))
     }
 }
+
+final class QuickAppTests: XCTestCase {
+    func testPackageNameBecomesMarketLaunchLink() {
+        XCTAssertEqual(
+            QuickApp.launchLink(from: "com.netflix.ninja"),
+            "market://launch?id=com.netflix.ninja"
+        )
+    }
+
+    func testFullLinkIsKept() {
+        XCTAssertEqual(
+            QuickApp.launchLink(from: "https://www.netflix.com/title"),
+            "https://www.netflix.com/title"
+        )
+    }
+
+    func testDefaultSelectionAndCustomApps() {
+        var state = RemoteState()
+        XCTAssertEqual(state.selectedQuickApps.map(\.id), QuickApp.featured.map(\.id))
+
+        let custom = QuickApp(
+            id: "custom-1",
+            name: "Kodi",
+            shortLabel: "KO",
+            link: QuickApp.launchLink(from: "org.xbmc.kodi")
+        )
+        state.customApps = [custom]
+        state.quickAppIDs = ["netflix", "custom-1"]
+        XCTAssertEqual(state.selectedQuickApps.map(\.id), ["netflix", "custom-1"])
+        XCTAssertEqual(state.allQuickApps.last?.name, "Kodi")
+    }
+
+    func testHuluRemovedAndMaxUsesPackageLaunch() {
+        XCTAssertNil(QuickApp.common.first(where: { $0.id == "hulu" }))
+        XCTAssertEqual(
+            QuickApp.common.first(where: { $0.id == "max" })?.link,
+            "market://launch?id=com.wbd.stream"
+        )
+    }
+}

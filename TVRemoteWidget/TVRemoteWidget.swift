@@ -129,9 +129,9 @@ struct TVRemoteWidgetEntryView: View {
                     key(.fastForward, "forward.fill", size: 22)
                 }
 
-                HStack(spacing: 8) {
-                    ForEach(QuickApp.featured) { app in
-                        appButton(app, size: 24)
+                HStack(spacing: 4) {
+                    ForEach(Array(entry.snapshot.quickApps.prefix(8))) { app in
+                        appButton(app, size: 22)
                     }
                 }
             }
