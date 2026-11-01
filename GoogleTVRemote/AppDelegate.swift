@@ -29,12 +29,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = item.button {
-            let image = NSImage(
-                systemSymbolName: "tv",
-                accessibilityDescription: "Google TV Remote"
-            )
-            image?.isTemplate = true
-            button.image = image
+            button.image = makeStatusImage(filled: false)
+            button.imagePosition = .imageOnly
             button.target = self
             button.action = #selector(togglePopover(_:))
         }
@@ -67,6 +63,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         statusItem?.isVisible = visible
     }
 
+    /// The status bar would not render the `av.remote` symbol or a custom
+    /// bitmap reliably, so use the app's own remote icon.
+    private func makeStatusImage(filled: Bool) -> NSImage {
+        if let icon = NSImage(named: NSImage.applicationIconName) {
+            icon.size = NSSize(width: 18, height: 18)
+            icon.isTemplate = false
+            return icon
+        }
+        let image = NSImage(systemSymbolName: "tv", accessibilityDescription: "Google TV Remote")!
+        image.size = NSSize(width: 18, height: 18)
+        image.isTemplate = true
+        return image
+    }
+
     @objc private func togglePopover(_ sender: Any?) {
         guard let statusItem, let button = statusItem.button, let popover else { return }
 
@@ -76,10 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
 
         if let model = AppModel.shared {
-            let name = model.isConnected ? "tv.fill" : "tv"
-            let image = NSImage(systemSymbolName: name, accessibilityDescription: "Google TV Remote")
-            image?.isTemplate = true
-            button.image = image
+            button.image = makeStatusImage(filled: model.isConnected)
         }
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         NSApp.activate(ignoringOtherApps: true)
