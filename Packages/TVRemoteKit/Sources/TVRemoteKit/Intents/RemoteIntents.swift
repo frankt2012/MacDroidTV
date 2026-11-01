@@ -1,3 +1,4 @@
+import AppKit
 import AppIntents
 import Foundation
 import WidgetKit
@@ -63,10 +64,13 @@ public actor WidgetRemote {
             try await connection.sendKey(key)
         }
 
+        // Only volume and power change what the widget shows. Waiting and
+        // reloading for D-pad presses made the widget feel laggy.
+        let changesState = key == .power || key == .volumeUp || key == .volumeDown || key == .mute
         if key == .volumeUp || key == .volumeDown || key == .mute {
             // The TV reports the new level asynchronously; give that message a
             // moment to arrive so the widget can show the real number.
-            try? await Task.sleep(nanoseconds: 250_000_000)
+            try? await Task.sleep(nanoseconds: 120_000_000)
         }
 
         let isOn = await connection.isOn
@@ -74,22 +78,30 @@ public actor WidgetRemote {
 
         store.update { state in
             state.cache.isOn = isOn
-            if let volumeInfo {
+            // A 0/0 report means the TV has no volume scale; do not let it
+            // wipe a real or estimated value.
+            if let volumeInfo, volumeInfo.max > 0 {
                 state.cache.volume = volumeInfo.level
                 state.cache.volumeMax = volumeInfo.max
                 state.cache.muted = volumeInfo.muted
+                state.cache.volumeEstimated = false
             } else {
                 switch key {
                 case .volumeUp:
                     if let level = state.cache.volume, let max = state.cache.volumeMax {
-                        state.cache.volume = min(level + 1, max)
+                        let step = state.cache.volumeStep ?? Swift.max(1, max / 50)
+                        state.cache.volume = min(level + step, max)
+                        state.cache.volumeEstimated = true
                     }
                 case .volumeDown:
-                    if let level = state.cache.volume {
-                        state.cache.volume = max(level - 1, 0)
+                    if let level = state.cache.volume, let max = state.cache.volumeMax {
+                        let step = state.cache.volumeStep ?? Swift.max(1, max / 50)
+                        state.cache.volume = Swift.max(level - step, 0)
+                        state.cache.volumeEstimated = true
                     }
                 case .mute:
                     state.cache.muted.toggle()
+                    state.cache.volumeEstimated = true
                 default:
                     break
                 }
@@ -97,7 +109,9 @@ public actor WidgetRemote {
             state.cache.updatedAt = Date()
         }
 
-        WidgetCenter.shared.reloadAllTimelines()
+        if changesState {
+            WidgetCenter.shared.reloadAllTimelines()
+        }
     }
 
     public func refresh() async throws {
@@ -131,7 +145,7 @@ public actor WidgetRemote {
         if let connection,
            connectionDeviceID == device.id,
            let connectionOpened,
-           Date().timeIntervalSince(connectionOpened) < 20,
+           Date().timeIntervalSince(connectionOpened) < 300,
            await connection.isReady {
             return connection
         }
@@ -223,7 +237,32 @@ public struct RemoteKeyIntent: AppIntent {
     public func perform() async throws -> some IntentResult {
         SharedStore.shared.appendDebugLog("[widget-intent] perform key=\(key)")
         guard let remoteKey = RemoteKey(rawValue: key) else { return .result() }
-        try? await WidgetRemote.shared.send(remoteKey)
+
+        // Fast path: use the menu bar app's already-open connection. This
+        // avoids a TLS handshake per tap and keeps a single remote session.
+        let appID = "com.franktriolo.googletvremote"
+        let appRunning = !NSRunningApplication.runningApplications(withBundleIdentifier: appID).isEmpty
+        if appRunning {
+            let id = CommandBridge.post(remoteKey)
+            // Waking the TV takes longer than a key press. Once the app has the
+            // command, never fall back: sending the key twice would double a
+            // D-pad move or toggle the TV back off.
+            let timeout: TimeInterval = remoteKey == .power ? 20 : 10
+            if let outcome = await CommandBridge.waitForResult(id: id, timeout: timeout) {
+                if let error = outcome, !error.isEmpty {
+                    SharedStore.shared.appendDebugLog("[widget-intent] app failed: \(error)")
+                }
+            } else {
+                SharedStore.shared.appendDebugLog("[widget-intent] app did not answer in \(Int(timeout))s")
+            }
+            return .result()
+        }
+
+        do {
+            try await WidgetRemote.shared.send(remoteKey)
+        } catch {
+            SharedStore.shared.appendDebugLog("[widget-intent] direct failed: \(error)")
+        }
         return .result()
     }
 }

@@ -12,3 +12,6 @@ GoogleTVRemote.xcodeproj/
 
 # macOS
 .DS_Store
+
+# Release build output
+build_release/

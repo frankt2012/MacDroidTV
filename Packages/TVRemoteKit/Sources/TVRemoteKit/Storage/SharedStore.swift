@@ -42,6 +42,11 @@ public final class SharedStore: @unchecked Sendable {
         fileURL?.path ?? "unavailable"
     }
 
+    /// Directory shared by the app and widget (App Group container).
+    public var directoryURL: URL? {
+        fileURL?.deletingLastPathComponent()
+    }
+
     public func load() -> RemoteState {
         lock.lock()
         defer { lock.unlock() }

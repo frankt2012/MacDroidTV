@@ -47,6 +47,7 @@ final class AppModel {
     @ObservationIgnored private var pairingClient: PairingClient?
     @ObservationIgnored private var pendingPairingHost: String?
     @ObservationIgnored private var pendingPairingName: String?
+    @ObservationIgnored private var commandTask: Task<Void, Never>?
 
     init(store: SharedStore = .shared) {
         self.store = store
@@ -72,9 +73,34 @@ final class AppModel {
         }
         discovery.start()
 
+        // Widget buttons hand their key presses to this process through the
+        // shared container so taps use the live connection instead of paying
+        // for a fresh TLS handshake each time. Polling is used rather than
+        // DistributedNotificationCenter, which the sandbox does not deliver.
+        commandTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                if let self, let command = CommandBridge.takePending() {
+                    // Ignore a command left over from a previous launch.
+                    if Date().timeIntervalSince(command.createdAt) < 30,
+                       let key = RemoteKey(rawValue: command.key) {
+                        self.lastError = nil
+                        await self.performSend(key)
+                        CommandBridge.writeResult(id: command.id, error: self.lastError)
+                    } else {
+                        CommandBridge.writeResult(id: command.id, error: "stale command")
+                    }
+                }
+                try? await Task.sleep(nanoseconds: 120_000_000)
+            }
+        }
+
         Task { [weak self] in
             await self?.connectToActiveDeviceIfNeeded()
         }
+    }
+
+    deinit {
+        commandTask?.cancel()
     }
 
     // MARK: - Derived state
@@ -411,7 +437,7 @@ final class AppModel {
     }
     #endif
 
-    private func performSend(_ key: RemoteKey) async {
+    func performSend(_ key: RemoteKey) async {
         // Waking a sleeping TV has its own flow: a power key sent while it is
         // still starting would put it straight back into standby.
         if key == .power, !state.cache.isOn {

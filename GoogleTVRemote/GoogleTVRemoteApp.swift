@@ -148,6 +148,30 @@ struct GoogleTVRemoteApp: App {
             exit(0)
         }
 
+        if let index = CommandLine.arguments.firstIndex(of: "--post-command") {
+            let raw = CommandLine.arguments.dropFirst(index + 1).first ?? "volumeUp"
+            guard let key = RemoteKey(rawValue: raw) else {
+                print("unknown key \(raw)")
+                exit(2)
+            }
+            print("container=\(SharedStore.shared.directoryURL?.path ?? "nil")")
+            let id = CommandBridge.post(key)
+            let dir = SharedStore.shared.directoryURL
+            let cmdPath = dir?.appendingPathComponent("command.json").path ?? "nil"
+            print("posted id=\(id) commandPath=\(cmdPath) exists=\(FileManager.default.fileExists(atPath: cmdPath))")
+            let sem = DispatchSemaphore(value: 0)
+            var message = "no response"
+            Task.detached {
+                if let outcome = await CommandBridge.waitForResult(id: id, timeout: 8) {
+                    message = outcome.flatMap { $0.isEmpty ? nil : $0 } ?? "ok"
+                }
+                sem.signal()
+            }
+            _ = sem.wait(timeout: .now() + 10)
+            print("post-command \(raw): \(message)")
+            exit(0)
+        }
+
         _model = State(initialValue: AppModel())
 
         #if DEBUG
