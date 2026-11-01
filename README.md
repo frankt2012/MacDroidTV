@@ -5,7 +5,8 @@ A native SwiftUI menu bar app and interactive desktop widget for Google TV / And
 - Menu bar popover with a full remote: D-pad, OK, back, home, menu, TV, settings,
   volume, mute, power, and media transport keys.
 - Small and medium widgets with a working D-pad, volume, mute, power, and live
-  power/volume status.
+  power/volume status. Each widget can be configured to control a different
+  paired TV.
 - Direct implementation of the Google TV Remote protocol v2 (TLS + protobuf),
   with no Python or ADB dependency.
 - Pairing certificate and TV list are shared between the app and widget through
@@ -36,9 +37,9 @@ The app is a menu bar-only app (`LSUIElement`), so it does not appear in the Doc
 To install it for normal use:
 
 ```sh
-rm -rf ~/Applications/GoogleTVRemote.app
-ditto build/Build/Products/Debug/GoogleTVRemote.app ~/Applications/GoogleTVRemote.app
-open ~/Applications/GoogleTVRemote.app
+rm -rf "$HOME/Applications/MacDroid TV.app"
+ditto "build/Build/Products/Debug/MacDroid TV.app" "$HOME/Applications/MacDroid TV.app"
+open -a "$HOME/Applications/MacDroid TV.app"
 ```
 
 Then open the menu bar icon and pair a TV. To add the widget, open Notification
@@ -109,7 +110,7 @@ Packages/TVRemoteKit/           Shared protocol, crypto, storage, intents
     Proto/                      Hand-rolled protobuf encode/decode
     Protocol/                   TLS framing, pairing, command connection
     Storage/                    App Group JSON store
-  Tests/TVRemoteKitTests/       37 unit tests
+  Tests/TVRemoteKitTests/       45 unit tests
 project.yml                     XcodeGen project definition
 ```
 
@@ -119,7 +120,7 @@ The app binary has several terminal flags that are useful when the UI cannot sho
 what is happening:
 
 ```sh
-APP="$HOME/Applications/GoogleTVRemote.app/Contents/MacOS/GoogleTVRemote"
+APP="$HOME/Applications/MacDroid TV.app/Contents/MacOS/MacDroid TV"
 
 "$APP" --diagnose      # container path, device count, cached state, debug log tail
 "$APP" --write-test    # writes and reads back a marker, then restores state
@@ -127,7 +128,7 @@ APP="$HOME/Applications/GoogleTVRemote.app/Contents/MacOS/GoogleTVRemote"
 "$APP" --volume-probe  # sends volume up/down/mute and logs every protocol frame
 "$APP" --discover      # browses Bonjour for TVs and prints their addresses
 "$APP" --wol-test MAC  # sends a Wake-on-LAN magic packet to a MAC
-open -a "$HOME/Applications/GoogleTVRemote.app" \
+open -a "$HOME/Applications/MacDroid TV.app" \
   --args --key-test volumeUp volumeDown  # sends keys through the app itself
 ```
 
@@ -140,7 +141,7 @@ the app bundle, run it through LaunchServices rather than from a shell if the
 terminal-launched process cannot reach the TV:
 
 ```sh
-open -a "$HOME/Applications/GoogleTVRemote.app" --args --volume-probe
+open -a "$HOME/Applications/MacDroid TV.app" --args --volume-probe
 # then wait for it to finish and inspect the tail:
 "$APP" --diagnose
 ```
