@@ -1,4 +1,4 @@
-# Google TV Remote for macOS
+# MacDroid TV for macOS
 
 A native SwiftUI menu bar app and interactive desktop widget for Google TV / Android TV.
 
@@ -43,7 +43,7 @@ open ~/Applications/GoogleTVRemote.app
 
 Then open the menu bar icon and pair a TV. To add the widget, open Notification
 Center (or right-click the desktop and choose **Edit Widgets**) and add
-**Google TV Remote**. The widget reads the app's shared state, so pair at least
+**MacDroid TV**. The widget reads the app's shared state, so pair at least
 one TV first.
 
 ## Signing and the App Group

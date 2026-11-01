@@ -149,7 +149,7 @@ struct TVRemoteWidgetEntryView: View {
             Image(systemName: "tv")
                 .font(.system(size: 28, weight: .light))
                 .foregroundStyle(.secondary)
-            Text("Google TV Remote")
+            Text("MacDroid TV")
                 .font(.headline)
             Text("Open the menu bar app to pair a TV.")
                 .font(.caption2)
@@ -330,7 +330,7 @@ struct TVRemoteWidget: Widget {
         StaticConfiguration(kind: kind, provider: TVRemoteProvider()) { entry in
             TVRemoteWidgetEntryView(entry: entry)
         }
-        .configurationDisplayName("Google TV Remote")
+        .configurationDisplayName("MacDroid TV")
         .description("Control your Google TV and see its power and volume.")
         .supportedFamilies([.systemSmall, .systemMedium])
     }

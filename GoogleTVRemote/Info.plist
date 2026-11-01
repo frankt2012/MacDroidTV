@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Google TV Remote</string>
+	<string>MacDroid TV</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -44,7 +44,7 @@
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026 Frank Triolo. All rights reserved.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Google TV Remote needs local network access to find and control your TV.</string>
+	<string>MacDroid TV needs local network access to find and control your TV.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>NSSupportsAutomaticGraphicsSwitching</key>

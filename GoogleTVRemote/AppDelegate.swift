@@ -109,7 +109,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             icon.isTemplate = false
             return icon
         }
-        let image = NSImage(systemSymbolName: "mediastick", accessibilityDescription: "Google TV Remote")!
+        let image = NSImage(systemSymbolName: "mediastick", accessibilityDescription: "MacDroid TV")!
         image.isTemplate = true
         return image
     }

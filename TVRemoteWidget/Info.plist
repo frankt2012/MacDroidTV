@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Google TV Remote</string>
+	<string>MacDroid TV</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -27,7 +27,7 @@
 		<string>_androidtvremote2._tcp</string>
 	</array>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Google TV Remote needs local network access to control your TV from the widget.</string>
+	<string>MacDroid TV needs local network access to control your TV from the widget.</string>
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionPointIdentifier</key>
