@@ -1,5 +1,9 @@
 # MacDroid TV for macOS
 
+![macOS 14+](https://img.shields.io/badge/macOS-14%2B-blue)
+![License: MIT](https://img.shields.io/badge/License-MIT-green)
+![AI-built](https://img.shields.io/badge/AI--built-DeepSeek%20V4.1%20Flash-purple)
+
 A native SwiftUI menu bar app and interactive desktop widget for Google TV / Android TV.
 
 > **AI-built:** This project was developed with substantial AI assistance — the
