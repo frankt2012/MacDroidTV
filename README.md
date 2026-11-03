@@ -112,6 +112,29 @@ network access. Allow it. Both the app and widget declare
 `NSLocalNetworkUsageDescription` and browse `_androidtvremote2._tcp`; if access
 is denied, discovery and commands fail even though pairing data is intact.
 
+## Wake-on-LAN and networked standby
+
+The power button can only turn on a TV that stays reachable on the network while it is off. Many TVs drop off Wi-Fi/Ethernet in standby unless a quick-start or networked-standby option is enabled. The app's **Devices → How to keep the TV reachable in standby…** guide covers this in-app.
+
+Typical setting names by brand (menus vary by model and year):
+
+| Brand | Setting |
+|---|---|
+| **TCL Google TV** | Settings → System → Power and energy → **Quick start** (On). If present, also Settings → Network & Internet → **Network Standby**. |
+| **Sony Bravia** | Settings → Network & Internet → **Remote start** → On (Networked Standby) or On (powered by apps). Some 2020 models also need Home Network → IP control → **Simple IP control**. |
+| **Hisense Google TV** | Settings → System → Power & Energy → **Fast Power On** or **Quick Start** (On), plus **Network Standby** if present. |
+| **Philips** | Settings → Network → **Wake on LAN** / **WoWLAN** (On). Some models only support WoWLAN over Wi-Fi. |
+| **Sharp Android TV** | Settings → Device Preferences → **Quick Start** (On), plus **Network Standby** if present. |
+| **Xiaomi / Mi Box** | Settings → Device Preferences / System → Power → **Wake on LAN** or **Networked standby** (On). |
+| **NVIDIA Shield** | Settings → Device Preferences → Power → **Wake on LAN** (On), or Developer options → **Stay awake**. |
+| **Chromecast / Google TV Streamer** | Settings → System → Power → **Fast boot** / **Always on** if available; use the supplied power adapter. |
+
+Tips:
+- Ethernet is more reliable than Wi-Fi for standby networking.
+- Give the TV a DHCP reservation so its address does not change.
+- Add the TV's Wake-on-LAN MAC in the app's Devices window.
+- Some TVs still leave the network in standby; those can only be switched on with their own remote.
+
 ## How pairing works
 
 1. The app creates a self-signed RSA-2048 client certificate on first use. The

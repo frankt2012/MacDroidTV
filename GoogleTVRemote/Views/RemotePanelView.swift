@@ -307,6 +307,15 @@ struct RemotePanelView: View {
 
             Spacer()
 
+            if let update = model.availableUpdate {
+                Button {
+                    NSWorkspace.shared.open(update.url)
+                } label: {
+                    Label("Update", systemImage: "arrow.down.circle")
+                }
+                .help("MacDroid TV \(update.version) is available")
+            }
+
             Button {
                 if let url = URL(string: "googletvremote://settings") {
                     NSWorkspace.shared.open(url)

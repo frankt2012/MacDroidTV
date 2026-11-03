@@ -1,3 +1,4 @@
+import AppKit
 import ServiceManagement
 import SwiftUI
 import TVRemoteKit
@@ -13,6 +14,7 @@ struct SettingsView: View {
     @State private var customLink = ""
     @State private var launchAtLogin = false
     @State private var launchAtLoginError: String?
+    @State private var updateMessage: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -136,6 +138,41 @@ struct SettingsView: View {
                                 || customLink.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                         )
                     }
+
+                    Divider()
+
+                    Text("Updates")
+                        .font(.subheadline.weight(.semibold))
+                    HStack {
+                        Text("MacDroid TV \(currentVersion)")
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button(model.isCheckingForUpdates ? "Checking…" : "Check for Updates") {
+                            Task {
+                                await model.checkForUpdates()
+                                if model.availableUpdate == nil {
+                                    updateMessage = "MacDroid TV is up to date."
+                                } else {
+                                    updateMessage = nil
+                                }
+                            }
+                        }
+                        .disabled(model.isCheckingForUpdates)
+                    }
+                    if let update = model.availableUpdate {
+                        HStack {
+                            Text("Version \(update.version) is available.")
+                                .foregroundStyle(.green)
+                            Spacer()
+                            Button("Download") {
+                                NSWorkspace.shared.open(update.url)
+                            }
+                        }
+                    } else if let updateMessage {
+                        Text(updateMessage)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 .padding(16)
             }
@@ -156,6 +193,10 @@ struct SettingsView: View {
         .onAppear {
             launchAtLogin = SMAppService.mainApp.status == .enabled
         }
+    }
+
+    private var currentVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
     }
 
     private func setLaunchAtLogin(_ enabled: Bool) {

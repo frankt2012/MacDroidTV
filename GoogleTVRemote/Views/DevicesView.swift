@@ -8,6 +8,7 @@ struct DevicesView: View {
     @State private var clientName = ""
     @State private var wakeMAC = ""
     @State private var showResetConfirmation = false
+    @State private var showingWakeHelp = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -49,6 +50,9 @@ struct DevicesView: View {
             model.cancelPairing()
         }) {
             PairingSheet(model: model)
+        }
+        .sheet(isPresented: $showingWakeHelp) {
+            WakeHelpView()
         }
     }
 
@@ -186,6 +190,12 @@ struct DevicesView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            Button("How to keep the TV reachable in standby…") {
+                showingWakeHelp = true
+            }
+            .buttonStyle(.link)
+            .font(.caption)
 
             HStack {
                 Text("Pairing identity")

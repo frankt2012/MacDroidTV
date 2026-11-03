@@ -39,6 +39,10 @@ final class AppModel {
     /// When the TV last woke, so boot-time volume reports do not clobber a
     /// volume the user synced while the TV was off.
     private var wokenAt: Date?
+    /// Latest GitHub release when it is newer than this build.
+    private(set) var availableUpdate: AvailableUpdate?
+    private(set) var isCheckingForUpdates = false
+    private(set) var updateCheckError: String?
 
     var showingDevices = false
     var showingPairing = false
@@ -126,6 +130,11 @@ final class AppModel {
 
         Task { [weak self] in
             await self?.connectToActiveDeviceIfNeeded()
+        }
+
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            await self?.checkForUpdates()
         }
 
         Self.shared = self
@@ -453,6 +462,21 @@ final class AppModel {
     func openApp(_ app: QuickApp) {
         Task { [weak self] in
             await self?.performAppLink(app.link)
+        }
+    }
+
+    func checkForUpdates() async {
+        guard !isCheckingForUpdates else { return }
+        isCheckingForUpdates = true
+        updateCheckError = nil
+        defer { isCheckingForUpdates = false }
+
+        if let update = await UpdateChecker.latestRelease() {
+            availableUpdate = update
+        } else {
+            // Distinguish "up to date" from a network failure only in the
+            // Settings message; never surface an update error as a TV error.
+            availableUpdate = nil
         }
     }
 

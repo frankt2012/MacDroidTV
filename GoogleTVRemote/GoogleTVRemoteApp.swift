@@ -236,6 +236,17 @@ struct GoogleTVRemoteApp: App {
             exit(0)
         }
 
+        if CommandLine.arguments.contains("--check-updates") {
+            Task {
+                if let update = await UpdateChecker.latestRelease() {
+                    SharedStore.shared.appendDebugLog("[update] available=\(update.version) url=\(update.url)")
+                } else {
+                    SharedStore.shared.appendDebugLog("[update] up to date (\(UpdateChecker.currentVersion()))")
+                }
+                exit(0)
+            }
+        }
+
         if let index = CommandLine.arguments.firstIndex(of: "--set-power-dot") {
             let value = CommandLine.arguments.dropFirst(index + 1).first != "0"
             UserDefaults.standard.set(value, forKey: "showPowerDot")
