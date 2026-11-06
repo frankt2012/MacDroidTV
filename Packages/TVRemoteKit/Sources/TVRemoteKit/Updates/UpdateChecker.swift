@@ -48,7 +48,7 @@ public enum UpdateChecker {
 
     /// Returns a newer release, or nil when this is the latest version or the
     /// check could not be completed.
-    public static func latestRelease() async -> AvailableUpdate? {
+    public static func latestRelease(allowSame: Bool = false) async -> AvailableUpdate? {
         guard let url = URL(string: "https://api.github.com/repos/\(repository)/releases/latest") else {
             return nil
         }
@@ -65,7 +65,7 @@ public enum UpdateChecker {
         else { return nil }
 
         let latest = normalise(release.tag_name)
-        guard isNewer(latest, than: currentVersion()) else { return nil }
+        guard allowSame || isNewer(latest, than: currentVersion()) else { return nil }
         let dmg = release.assets?.first { $0.name.lowercased().hasSuffix(".dmg") }
         let downloadURL = dmg.flatMap { URL(string: $0.browser_download_url) }
         let sha = dmg?.digest?

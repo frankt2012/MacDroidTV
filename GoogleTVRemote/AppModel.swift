@@ -527,13 +527,6 @@ final class AppModel {
 
         if let update = await UpdateChecker.latestRelease() {
             availableUpdate = update
-            if UserDefaults.standard.bool(forKey: "autoInstallUpdates") {
-                do {
-                    try await UpdateInstaller.install(update)
-                } catch {
-                    updateCheckError = error.localizedDescription
-                }
-            }
         } else {
             // Distinguish "up to date" from a network failure only in the
             // Settings message; never surface an update error as a TV error.

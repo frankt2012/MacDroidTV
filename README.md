@@ -21,8 +21,8 @@ A native SwiftUI menu bar app and interactive desktop widget for Google TV / And
   paired TV.
 - Auto-refreshes while the TV is off, so turning it on with its own remote updates
   the app and widget automatically.
-- Checks GitHub releases for updates from Settings, with an optional daily
-  download-and-install mode.
+- Checks GitHub releases for updates from Settings once a day and links to the
+  release download.
 - Direct implementation of the Google TV Remote protocol v2 (TLS + protobuf),
   with no Python or ADB dependency.
 - Pairing certificate and TV list are shared between the app and widget through

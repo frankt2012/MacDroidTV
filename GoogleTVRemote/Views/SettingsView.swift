@@ -10,7 +10,6 @@ struct SettingsView: View {
 
     @AppStorage("showMenuBarIcon") private var showMenuBarIcon = true
     @AppStorage("showPowerDot") private var showPowerDot = true
-    @AppStorage("autoInstallUpdates") private var autoInstallUpdates = false
     @State private var customName = ""
     @State private var customLink = ""
     @State private var launchAtLogin = false
@@ -174,12 +173,6 @@ struct SettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-
-                    Toggle("Automatically download and install updates", isOn: $autoInstallUpdates)
-                    Text("Checks once a day. When an update is found, the app quits, replaces itself, and reopens. Downloads are verified against the release checksum.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(16)
             }
