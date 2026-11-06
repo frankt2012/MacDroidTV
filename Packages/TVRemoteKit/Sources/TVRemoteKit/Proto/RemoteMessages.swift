@@ -76,11 +76,11 @@ public extension RemoteMessage {
         return writer.data
     }
 
-    static func keyInject(_ keyCode: UInt64) -> Data {
+    static func keyInject(_ keyCode: UInt64, direction: UInt64 = 3) -> Data {
         var writer = ProtoWriter()
         writer.writeMessage(10) { key in
             key.writeVarint(1, keyCode)
-            key.writeVarint(2, 3) // RemoteDirection.SHORT
+            key.writeVarint(2, direction)
         }
         return writer.data
     }

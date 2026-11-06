@@ -120,6 +120,77 @@ public actor TVConnection {
         )
     }
 
+    /// Types text as individual Android key events. More compatible with apps
+    /// that use their own text fields instead of the system IME.
+    public func sendKeyText(_ text: String) async throws {
+        guard !text.isEmpty else { return }
+        try await ensureReady()
+        guard let frame else { throw TVConnectionError.notPaired }
+
+        for character in text {
+            guard let key = Self.keyCode(for: character) else { continue }
+            if character.isUppercase || Self.needsShift(character) {
+                try await frame.send(RemoteMessage.keyInject(59, direction: 1)) // shift down
+                try? await Task.sleep(nanoseconds: 20_000_000)
+                try await frame.send(RemoteMessage.keyInject(key))
+                try? await Task.sleep(nanoseconds: 20_000_000)
+                try await frame.send(RemoteMessage.keyInject(59, direction: 2)) // shift up
+            } else {
+                try await frame.send(RemoteMessage.keyInject(key))
+            }
+            try? await Task.sleep(nanoseconds: 30_000_000)
+        }
+    }
+
+    private static func keyCode(for character: Character) -> UInt64? {
+        guard let ascii = character.asciiValue else { return nil }
+        switch character {
+        case "a"..."z":
+            return 29 + UInt64(ascii - Character("a").asciiValue!)
+        case "A"..."Z":
+            return 29 + UInt64(ascii - Character("A").asciiValue!)
+        case "0"..."9":
+            return 7 + UInt64(ascii - Character("0").asciiValue!)
+        case " ":
+            return 62
+        case "\n", "\r":
+            return 66
+        case ".": return 56
+        case ",": return 55
+        case "-": return 69
+        case "=": return 70
+        case "/": return 76
+        case ";": return 74
+        case "'": return 75
+        case "[": return 71
+        case "]": return 72
+        case "\\": return 73
+        case "`": return 68
+        case "@": return 77
+        case "#": return 18
+        case "*": return 17
+        case "+": return 81
+        case "!": return 8
+        case "(": return 16
+        case ")": return 7
+        case "_": return 69
+        case ":": return 74
+        case "\"": return 75
+        case "?": return 76
+        default:
+            return nil
+        }
+    }
+
+    private static func needsShift(_ character: Character) -> Bool {
+        switch character {
+        case "!", "(", ")", "_", ":", "\"", "?":
+            return true
+        default:
+            return false
+        }
+    }
+
     /// Waits until the TV reports itself on, or the timeout elapses.
     ///
     /// A Wake-on-LAN packet wakes the TV asynchronously: the handshake can

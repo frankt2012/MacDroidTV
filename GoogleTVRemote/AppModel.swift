@@ -501,11 +501,11 @@ final class AppModel {
     }
 
     /// Sends text to the TV's focused text field.
-    func sendText(_ text: String) {
+    func sendText(_ text: String, mode: TextInputMode = .ime) {
         let trimmed = text.trimmingCharacters(in: .newlines)
         guard !trimmed.isEmpty else { return }
         Task { [weak self] in
-            await self?.performSendText(trimmed)
+            await self?.performSendText(trimmed, mode: mode)
         }
     }
 
@@ -684,9 +684,16 @@ final class AppModel {
         }
     }
 
-    private func performSendText(_ text: String) async {
+    private func performSendText(_ text: String, mode: TextInputMode) async {
         guard let connection = await ensureConnection() else { return }
         do {
+            if mode == .imeAfterBack {
+                // Some apps keep their own on-screen keyboard up and ignore
+                // IME text until it is dismissed. Back leaves the text field
+                // focused in Stremio/BrowseHere.
+                try await connection.sendKey(.back)
+                try? await Task.sleep(nanoseconds: 300_000_000)
+            }
             try await connection.sendText(text)
         } catch {
             lastError = error.localizedDescription

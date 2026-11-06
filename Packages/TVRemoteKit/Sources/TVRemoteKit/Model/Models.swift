@@ -240,3 +240,23 @@ public struct WidgetSnapshot: Equatable, Sendable {
         )
     }
 }
+
+/// How the Mac keyboard should send text to the TV.
+public enum TextInputMode: String, CaseIterable, Identifiable, Sendable {
+    /// Sends a single IME batch edit. Works with apps that use the system
+    /// Android TV keyboard, such as YouTube search.
+    case ime
+    /// Dismisses the TV's on-screen keyboard with Back, then sends the IME
+    /// text. Some apps (Stremio, BrowseHere) only accept IME text once their
+    /// own on-screen keyboard is closed.
+    case imeAfterBack
+
+    public var id: String { rawValue }
+
+    public var label: String {
+        switch self {
+        case .ime: return "TV keyboard"
+        case .imeAfterBack: return "Back first"
+        }
+    }
+}
