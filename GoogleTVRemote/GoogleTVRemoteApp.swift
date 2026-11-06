@@ -229,6 +229,13 @@ struct GoogleTVRemoteApp: App {
 
         _model = State(initialValue: AppModel())
 
+        if let index = CommandLine.arguments.firstIndex(of: "--set-auto-update") {
+            let value = CommandLine.arguments.dropFirst(index + 1).first != "0"
+            UserDefaults.standard.set(value, forKey: "autoInstallUpdates")
+            print("autoInstallUpdates=\(value)")
+            exit(0)
+        }
+
         if let index = CommandLine.arguments.firstIndex(of: "--set-menu-bar") {
             let value = CommandLine.arguments.dropFirst(index + 1).first != "0"
             UserDefaults.standard.set(value, forKey: "showMenuBarIcon")

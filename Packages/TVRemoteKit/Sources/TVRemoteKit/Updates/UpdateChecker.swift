@@ -5,11 +5,21 @@ public struct AvailableUpdate: Equatable, Sendable {
     public let version: String
     public let url: URL
     public let notes: String?
+    public let downloadURL: URL?
+    public let sha256: String?
 
-    public init(version: String, url: URL, notes: String?) {
+    public init(
+        version: String,
+        url: URL,
+        notes: String?,
+        downloadURL: URL? = nil,
+        sha256: String? = nil
+    ) {
         self.version = version
         self.url = url
         self.notes = notes
+        self.downloadURL = downloadURL
+        self.sha256 = sha256
     }
 }
 
@@ -19,10 +29,17 @@ public struct AvailableUpdate: Equatable, Sendable {
 public enum UpdateChecker {
     public static let repository = "frankt2012/MacDroidTV"
 
+    private struct Asset: Decodable {
+        let name: String
+        let browser_download_url: String
+        let digest: String?
+    }
+
     private struct Release: Decodable {
         let tag_name: String
         let html_url: String
         let body: String?
+        let assets: [Asset]?
     }
 
     public static func currentVersion() -> String {
@@ -49,7 +66,18 @@ public enum UpdateChecker {
 
         let latest = normalise(release.tag_name)
         guard isNewer(latest, than: currentVersion()) else { return nil }
-        return AvailableUpdate(version: latest, url: releaseURL, notes: release.body)
+        let dmg = release.assets?.first { $0.name.lowercased().hasSuffix(".dmg") }
+        let downloadURL = dmg.flatMap { URL(string: $0.browser_download_url) }
+        let sha = dmg?.digest?
+            .replacingOccurrences(of: "sha256:", with: "")
+            .lowercased()
+        return AvailableUpdate(
+            version: latest,
+            url: releaseURL,
+            notes: release.body,
+            downloadURL: downloadURL,
+            sha256: sha
+        )
     }
 
     public static func normalise(_ version: String) -> String {

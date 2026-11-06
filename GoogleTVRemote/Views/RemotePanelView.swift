@@ -5,6 +5,7 @@ import TVRemoteKit
 struct RemotePanelView: View {
     @Bindable var model: AppModel
     @State private var showingVolumeSync = false
+    @State private var showingKeyboard = false
 
     var body: some View {
         VStack(spacing: 12) {
@@ -31,6 +32,9 @@ struct RemotePanelView: View {
         }
         .popover(isPresented: $showingVolumeSync, arrowEdge: .bottom) {
             VolumeSyncView(model: model)
+        }
+        .sheet(isPresented: $showingKeyboard) {
+            KeyboardInputView(model: model)
         }
     }
 
@@ -137,6 +141,16 @@ struct RemotePanelView: View {
             keyButton(.menu, "list.bullet")
             keyButton(.tv, "tv")
             keyButton(.settings, "gearshape", help: "TV settings")
+            Button {
+                showingKeyboard = true
+            } label: {
+                Image(systemName: "keyboard")
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(width: 36, height: 36)
+                    .background(Circle().fill(Color.primary.opacity(0.07)))
+            }
+            .buttonStyle(.plain)
+            .help("Type to the TV")
         }
     }
 

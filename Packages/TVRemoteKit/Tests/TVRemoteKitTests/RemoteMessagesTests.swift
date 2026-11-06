@@ -84,9 +84,15 @@ final class RemoteMessagesTests: XCTestCase {
         XCTAssertEqual(device.appVersion, "1.0.0")
     }
 
-    func testRequestedFeaturesExcludeIME() {
-        XCTAssertEqual(RemoteMessage.requestedFeatures, 611)
+    func testRequestedFeaturesIncludeIME() {
+        XCTAssertEqual(RemoteMessage.requestedFeatures, 615)
+        XCTAssertNotEqual(RemoteMessage.requestedFeatures & RemoteMessage.featureIme, 0)
         XCTAssertEqual(RemoteMessage.requestedFeatures & (1 << 10), 0)
+    }
+
+    func testImeBatchEditEncodesText() {
+        let data = RemoteMessage.imeBatchEdit(text: "hello", imeCounter: 1, fieldCounter: 2)
+        XCTAssertNotNil(data.range(of: Data("hello".utf8)))
     }
 
     func testUnknownMessageDecodesAsUnknown() throws {

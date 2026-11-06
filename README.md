@@ -14,10 +14,15 @@ A native SwiftUI menu bar app and interactive desktop widget for Google TV / And
 **[Download the latest release →](https://github.com/frankt2012/MacDroidTV/releases/latest)**
 
 - Menu bar popover with a full remote: D-pad, OK, back, home, menu, TV, settings,
-  volume, mute, power, and media transport keys.
+  volume, mute, power, media transport keys, and a keyboard for typing directly
+  into TV search/text fields.
 - Small and medium widgets with a working D-pad, volume, mute, power, and live
   power/volume status. Each widget can be configured to control a different
   paired TV.
+- Auto-refreshes while the TV is off, so turning it on with its own remote updates
+  the app and widget automatically.
+- Checks GitHub releases for updates from Settings, with an optional daily
+  download-and-install mode.
 - Direct implementation of the Google TV Remote protocol v2 (TLS + protobuf),
   with no Python or ADB dependency.
 - Pairing certificate and TV list are shared between the app and widget through

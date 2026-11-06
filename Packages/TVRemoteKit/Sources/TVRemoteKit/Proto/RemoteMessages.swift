@@ -37,14 +37,14 @@ public extension RemoteMessage {
     /// Feature bits understood by this client.
     static let featurePing: UInt64 = 1 << 0
     static let featureKey: UInt64 = 1 << 1
+    static let featureIme: UInt64 = 1 << 2
     static let featurePower: UInt64 = 1 << 5
     static let featureVolume: UInt64 = 1 << 6
     static let featureAppLink: UInt64 = 1 << 9
 
-    /// 611: ping, key, power, volume and app links. IME is deliberately left
-    /// out because enabling it makes some TVs show a "use your keyboard" card.
+    /// Ping, key, IME (text entry), power, volume and app links.
     static let requestedFeatures: UInt64 =
-        featurePing | featureKey | featurePower | featureVolume | featureAppLink
+        featurePing | featureKey | featureIme | featurePower | featureVolume | featureAppLink
 
     static func configureReply(features: UInt64) -> Data {
         var writer = ProtoWriter()
@@ -81,6 +81,24 @@ public extension RemoteMessage {
         writer.writeMessage(10) { key in
             key.writeVarint(1, keyCode)
             key.writeVarint(2, 3) // RemoteDirection.SHORT
+        }
+        return writer.data
+    }
+
+    static func imeBatchEdit(text: String, imeCounter: Int32, fieldCounter: Int32) -> Data {
+        var writer = ProtoWriter()
+        writer.writeMessage(21) { batch in
+            batch.writeVarint(1, UInt64(UInt32(bitPattern: imeCounter)))
+            batch.writeVarint(2, UInt64(UInt32(bitPattern: fieldCounter)))
+            batch.writeMessage(3) { edit in
+                edit.writeVarint(1, 1) // insert
+                edit.writeMessage(2) { field in
+                    let position = UInt64(Swift.max(text.count - 1, 0))
+                    field.writeVarint(1, position)
+                    field.writeVarint(2, position)
+                    field.writeString(3, text)
+                }
+            }
         }
         return writer.data
     }

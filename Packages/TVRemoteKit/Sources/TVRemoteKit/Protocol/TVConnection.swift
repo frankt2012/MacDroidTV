@@ -33,6 +33,10 @@ public actor TVConnection {
 
     public private(set) var deviceInfo = RemoteDeviceInfo()
     public private(set) var isOn = false
+    /// Counters from the TV's last IME batch-edit message. They must be echoed
+    /// when sending text so the TV accepts the edit.
+    public private(set) var imeCounter: Int32 = 0
+    public private(set) var fieldCounter: Int32 = 0
     public private(set) var volumeInfo: VolumeInfo?
 
     public init(
@@ -102,6 +106,20 @@ public actor TVConnection {
         try await frame.send(RemoteMessage.appLink(link))
     }
 
+    /// Sends text to the TV's focused text field using the IME channel.
+    public func sendText(_ text: String) async throws {
+        guard !text.isEmpty else { return }
+        try await ensureReady()
+        guard let frame else { throw TVConnectionError.notPaired }
+        try await frame.send(
+            RemoteMessage.imeBatchEdit(
+                text: text,
+                imeCounter: imeCounter,
+                fieldCounter: fieldCounter
+            )
+        )
+    }
+
     /// Waits until the TV reports itself on, or the timeout elapses.
     ///
     /// A Wake-on-LAN packet wakes the TV asynchronously: the handshake can
@@ -129,9 +147,9 @@ public actor TVConnection {
 
     /// Re-runs the handshake and returns the TV's current power state.
     @discardableResult
-    public func refresh() async throws -> Bool {
+    public func refresh(timeout: TimeInterval = 10) async throws -> Bool {
         disconnectInternal()
-        try await ensureReady()
+        try await ensureReady(timeout: timeout)
         return isOn
     }
 
@@ -282,6 +300,10 @@ public actor TVConnection {
                 // on a dead session.
                 onEvent?(.disconnected(nil))
             }
+
+        case .imeBatchEdit(let ime, let field):
+            imeCounter = ime
+            fieldCounter = field
 
         case .error:
             // A TV answers an app-link launch it cannot resolve with an error

@@ -56,6 +56,8 @@ final class AppModel {
     @ObservationIgnored private var pendingPairingHost: String?
     @ObservationIgnored private var pendingPairingName: String?
     @ObservationIgnored private var commandTask: Task<Void, Never>?
+    @ObservationIgnored private var powerPollTask: Task<Void, Never>?
+    @ObservationIgnored private var updatePollTask: Task<Void, Never>?
 
     init(store: SharedStore = .shared) {
         self.store = store
@@ -137,11 +139,47 @@ final class AppModel {
             await self?.checkForUpdates()
         }
 
+        startPowerPolling()
+        startUpdatePolling()
         Self.shared = self
     }
 
     deinit {
         commandTask?.cancel()
+        powerPollTask?.cancel()
+        updatePollTask?.cancel()
+    }
+
+    /// Daily update check. The hourly loop only checks whether 24 hours have
+    /// elapsed, so a long-running menu bar app still checks once a day.
+    private func startUpdatePolling() {
+        updatePollTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                let last = UserDefaults.standard.object(forKey: "lastUpdateCheck") as? Date
+                    ?? .distantPast
+                if Date().timeIntervalSince(last) >= 24 * 60 * 60 {
+                    await self?.checkForUpdates()
+                }
+                try? await Task.sleep(nanoseconds: 60 * 60 * 1_000_000_000)
+            }
+        }
+    }
+
+    /// While the TV is off (or the app is disconnected), probe it periodically
+    /// so turning it on with its own remote is reflected in the app.
+    private func startPowerPolling() {
+        powerPollTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 20_000_000_000)
+                guard let self, self.isPaired, !self.isWaking else { continue }
+                if self.isOn, self.isConnected { continue }
+                await self.refreshNow(
+                    reportFailure: false,
+                    timeout: 3,
+                    discoveryTimeout: 2
+                )
+            }
+        }
     }
 
     // MARK: - Derived state
@@ -332,8 +370,10 @@ final class AppModel {
         }
 
         connectingDeviceID = device.id
-        status = .connecting
-        lastError = nil
+        if reportFailure {
+            status = .connecting
+            lastError = nil
+        }
 
         var connected = false
         do {
@@ -377,6 +417,8 @@ final class AppModel {
         if connected {
             status = .connected
             markSeen(device)
+        } else if !reportFailure {
+            status = .idle
         }
     }
 
@@ -458,6 +500,15 @@ final class AppModel {
         send(.power)
     }
 
+    /// Sends text to the TV's focused text field.
+    func sendText(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .newlines)
+        guard !trimmed.isEmpty else { return }
+        Task { [weak self] in
+            await self?.performSendText(trimmed)
+        }
+    }
+
     /// Opens an app on the TV through its Android TV deep link.
     func openApp(_ app: QuickApp) {
         Task { [weak self] in
@@ -469,10 +520,20 @@ final class AppModel {
         guard !isCheckingForUpdates else { return }
         isCheckingForUpdates = true
         updateCheckError = nil
-        defer { isCheckingForUpdates = false }
+        defer {
+            isCheckingForUpdates = false
+            UserDefaults.standard.set(Date(), forKey: "lastUpdateCheck")
+        }
 
         if let update = await UpdateChecker.latestRelease() {
             availableUpdate = update
+            if UserDefaults.standard.bool(forKey: "autoInstallUpdates") {
+                do {
+                    try await UpdateInstaller.install(update)
+                } catch {
+                    updateCheckError = error.localizedDescription
+                }
+            }
         } else {
             // Distinguish "up to date" from a network failure only in the
             // Settings message; never surface an update error as a TV error.
@@ -487,13 +548,24 @@ final class AppModel {
     }
 
     /// Awaitable version used by the widget's refresh button.
-    func refreshNow() async {
+    func refreshNow(
+        reportFailure: Bool = true,
+        timeout: TimeInterval = 10,
+        discoveryTimeout: TimeInterval = 5
+    ) async {
         isRefreshing = true
         defer { isRefreshing = false }
 
-        guard let connection = await ensureConnection() else { return }
+        guard let connection = await ensureConnection(
+            timeout: timeout,
+            discoveryTimeout: discoveryTimeout,
+            reportFailure: reportFailure
+        ) else {
+            if !reportFailure { status = .idle }
+            return
+        }
         do {
-            let isOn = try await connection.refresh()
+            let isOn = try await connection.refresh(timeout: timeout)
             let volume = await connection.volumeInfo
             status = .connected
             if let device = state.activeDevice {
@@ -501,8 +573,12 @@ final class AppModel {
             }
             updateCache(isOn: isOn, volume: volume)
         } catch {
-            lastError = error.localizedDescription
-            status = .failed(error.localizedDescription)
+            if reportFailure {
+                lastError = error.localizedDescription
+                status = .failed(error.localizedDescription)
+            } else {
+                status = .idle
+            }
             self.connection = nil
             connectionDeviceID = nil
         }
@@ -607,6 +683,18 @@ final class AppModel {
             if key == .mute {
                 mutateState { state in state.cache.muted.toggle() }
             }
+        } catch {
+            lastError = error.localizedDescription
+            status = .failed(error.localizedDescription)
+            self.connection = nil
+            connectionDeviceID = nil
+        }
+    }
+
+    private func performSendText(_ text: String) async {
+        guard let connection = await ensureConnection() else { return }
+        do {
+            try await connection.sendText(text)
         } catch {
             lastError = error.localizedDescription
             status = .failed(error.localizedDescription)
