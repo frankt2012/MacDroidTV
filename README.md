@@ -15,7 +15,8 @@ A native SwiftUI menu bar app and interactive desktop widget for Google TV / And
 
 - Menu bar popover with a full remote: D-pad, OK, back, home, menu, TV, settings,
   volume, mute, power, media transport keys, and a keyboard for typing directly
-  into TV search/text fields.
+  into TV search/text fields. A Back-first mode handles apps that keep their own
+  on-screen keyboard open.
 - Small and medium widgets with a working D-pad, volume, mute, power, and live
   power/volume status. Each widget can be configured to control a different
   paired TV.
