@@ -456,6 +456,7 @@ final class AppModel {
             try await newConnection.connect(timeout: timeout)
             let isOn = await newConnection.isOn
             let volume = await newConnection.volumeInfo
+            markWokenIfNeeded(isOn: isOn)
             status = .connected
             updateCache(isOn: isOn, volume: volume)
         } catch {
@@ -560,6 +561,7 @@ final class AppModel {
         do {
             let isOn = try await connection.refresh(timeout: timeout)
             let volume = await connection.volumeInfo
+            markWokenIfNeeded(isOn: isOn)
             status = .connected
             if let device = state.activeDevice {
                 markSeen(device)
@@ -806,15 +808,25 @@ final class AppModel {
         return "The TV is off and did not answer Wake-on-LAN. Check that the TV's always-on/networked standby setting is enabled and that the MAC address is correct."
     }
 
+    /// A TV that just turned on (from its own remote, not this app) can send a
+    /// boot-time volume report. Mark the wake so the synced estimate survives.
+    private func markWokenIfNeeded(isOn: Bool) {
+        if isOn, !state.cache.isOn {
+            wokenAt = Date()
+        }
+    }
+
     private func handle(_ event: TVEvent, deviceID: UUID) {
         guard connectionDeviceID == deviceID else { return }
 
         switch event {
         case .connected(_, let isOn):
+            markWokenIfNeeded(isOn: isOn)
             status = .connected
             updateCache(isOn: isOn, volume: nil)
 
         case .power(let isOn):
+            markWokenIfNeeded(isOn: isOn)
             if !isOn { wokenAt = nil }
             updateCache(isOn: isOn, volume: nil)
 
