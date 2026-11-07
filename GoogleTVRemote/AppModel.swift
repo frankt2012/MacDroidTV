@@ -847,14 +847,24 @@ final class AppModel {
             connection = nil
             connectionDeviceID = nil
             // A TV that just powered off drops the socket. That is expected, so
-            // do not turn it into an error banner.
-            if let message, state.cache.isOn {
+            // do not turn it into an error banner. Transient aborts during a
+            // wake or a background refresh are also normal; the next refresh
+            // reconnects.
+            if let message, state.cache.isOn, !Self.isTransientDisconnect(message) {
                 status = .failed(message)
                 lastError = message
             } else {
                 status = .idle
             }
         }
+    }
+
+    private static func isTransientDisconnect(_ message: String) -> Bool {
+        let lower = message.lowercased()
+        return lower.contains("software caused connection abort")
+            || lower.contains("connection reset by peer")
+            || lower.contains("network connection was lost")
+            || lower.contains("broken pipe")
     }
 
     private func updateCache(
