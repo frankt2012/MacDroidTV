@@ -118,7 +118,9 @@ final class AppModel {
                                 }
                                 self.state = self.store.load()
                             } catch {
-                                self.lastError = error.localizedDescription
+                                if !Self.isTransientDisconnect(error.localizedDescription) {
+                                    self.lastError = error.localizedDescription
+                                }
                             }
                         }
                         CommandBridge.writeResult(id: command.id, error: self.lastError)
@@ -458,6 +460,7 @@ final class AppModel {
             let volume = await newConnection.volumeInfo
             markWokenIfNeeded(isOn: isOn)
             status = .connected
+            lastError = nil
             updateCache(isOn: isOn, volume: volume)
         } catch {
             await newConnection.disconnect()
@@ -470,8 +473,30 @@ final class AppModel {
     }
 
     private func reportConnectFailure(_ error: Error) {
-        status = .failed(error.localizedDescription)
-        lastError = error.localizedDescription
+        let message = error.localizedDescription
+        guard !Self.isTransientDisconnect(message) else {
+            // A Mac that just woke or switched networks cannot reach anything
+            // for a moment. Stay quiet and let the power poll reconnect.
+            status = .idle
+            return
+        }
+        status = .failed(message)
+        lastError = message
+    }
+
+    /// Handles a failed key/text/app-link command. Path-level network errors
+    /// are expected around sleep and interface changes, so drop the stale
+    /// socket without bothering the user; the next action reconnects.
+    private func reportOperationFailure(_ error: Error) {
+        connection = nil
+        connectionDeviceID = nil
+        let message = error.localizedDescription
+        guard !Self.isTransientDisconnect(message) else {
+            status = .idle
+            return
+        }
+        lastError = message
+        status = .failed(message)
     }
 
     func disconnect() async {
@@ -563,14 +588,17 @@ final class AppModel {
             let volume = await connection.volumeInfo
             markWokenIfNeeded(isOn: isOn)
             status = .connected
+            lastError = nil
             if let device = state.activeDevice {
                 markSeen(device)
             }
             updateCache(isOn: isOn, volume: volume)
         } catch {
-            if reportFailure {
-                lastError = error.localizedDescription
-                status = .failed(error.localizedDescription)
+            let message = error.localizedDescription
+            let transient = Self.isTransientDisconnect(message)
+            if reportFailure, !transient {
+                lastError = message
+                status = .failed(message)
             } else {
                 status = .idle
             }
@@ -679,10 +707,7 @@ final class AppModel {
                 mutateState { state in state.cache.muted.toggle() }
             }
         } catch {
-            lastError = error.localizedDescription
-            status = .failed(error.localizedDescription)
-            self.connection = nil
-            connectionDeviceID = nil
+            reportOperationFailure(error)
         }
     }
 
@@ -698,10 +723,7 @@ final class AppModel {
             }
             try await connection.sendText(text)
         } catch {
-            lastError = error.localizedDescription
-            status = .failed(error.localizedDescription)
-            self.connection = nil
-            connectionDeviceID = nil
+            reportOperationFailure(error)
         }
     }
 
@@ -715,10 +737,7 @@ final class AppModel {
         do {
             try await connection.sendAppLink(link)
         } catch {
-            lastError = error.localizedDescription
-            status = .failed(error.localizedDescription)
-            self.connection = nil
-            connectionDeviceID = nil
+            reportOperationFailure(error)
         }
     }
 
@@ -871,12 +890,23 @@ final class AppModel {
         }
     }
 
+    /// Errors that mean the Mac's network path blipped (sleep/wake, interface
+    /// switch, Wi-Fi roam) rather than the TV being unreachable. The next
+    /// refresh reconnects, so these should never raise a banner.
     private static func isTransientDisconnect(_ message: String) -> Bool {
         let lower = message.lowercased()
         return lower.contains("software caused connection abort")
             || lower.contains("connection reset by peer")
             || lower.contains("network connection was lost")
             || lower.contains("broken pipe")
+            || lower.contains("network is down")
+            || lower.contains("network is unreachable")
+            || lower.contains("nwerror error 50")
+            || lower.contains("nwerror error 51")
+            || lower.contains("posix error 50")
+            || lower.contains("posix error 51")
+            || lower.contains("no route to host")
+            || lower.contains("not connected")
     }
 
     private func updateCache(
