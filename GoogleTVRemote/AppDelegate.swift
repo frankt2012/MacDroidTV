@@ -25,6 +25,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         setupStatusItem()
     }
 
+    /// The first activation is when macOS should ask for Local Network access:
+    /// the user has deliberately opened the remote rather than the app quietly
+    /// touching the LAN at login.
+    func applicationDidBecomeActive(_ notification: Notification) {
+        AppModel.shared?.primeLocalNetworkAccess()
+    }
+
     /// SwiftUI's MenuBarExtra proved unreliable on cold launch, so the status
     /// item is owned directly. The popover hosts the same remote panel.
     private func setupStatusItem() {
@@ -151,6 +158,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         updateStatusButton(isOn: AppModel.shared?.isOn ?? false)
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         NSApp.activate(ignoringOtherApps: true)
+        AppModel.shared?.primeLocalNetworkAccess()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -197,6 +205,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private func showVolumeSync(_ model: AppModel) {
+        model.primeLocalNetworkAccess()
         if let syncWindow {
             syncWindow.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
@@ -214,6 +223,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private func showSettings(model: AppModel) {
+        model.primeLocalNetworkAccess()
         if let settingsWindow {
             settingsWindow.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)

@@ -57,6 +57,9 @@ final class AppModel {
     @ObservationIgnored private var pendingPairingName: String?
     @ObservationIgnored private var commandTask: Task<Void, Never>?
     @ObservationIgnored private var powerPollTask: Task<Void, Never>?
+    /// True once the app has deliberately used the local network. macOS shows
+    /// its Local Network permission alert on that first use.
+    @ObservationIgnored private(set) var hasPrimedLocalNetwork = false
     @ObservationIgnored private var updatePollTask: Task<Void, Never>?
 
     init(store: SharedStore = .shared) {
@@ -81,7 +84,6 @@ final class AppModel {
                 self?.discovered = devices
             }
         }
-        discovery.start()
 
         // Widget buttons hand their key presses to this process through the
         // shared container so taps use the live connection instead of paying
@@ -92,6 +94,7 @@ final class AppModel {
                 if let self, let command = CommandBridge.takePending() {
                     // Ignore a command left over from a previous launch.
                     if Date().timeIntervalSince(command.createdAt) < 30 {
+                        self.primeLocalNetworkAccess(connect: false)
                         self.lastError = nil
                         let targetID = command.deviceID.flatMap(UUID.init(uuidString:))
                         let hasTarget = command.deviceID != nil
@@ -173,7 +176,11 @@ final class AppModel {
         powerPollTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 20_000_000_000)
-                guard let self, self.isPaired, !self.isWaking else { continue }
+                guard let self,
+                      self.hasPrimedLocalNetwork,
+                      self.isPaired,
+                      !self.isWaking
+                else { continue }
                 if self.isOn, self.isConnected { continue }
                 await self.refreshNow(
                     reportFailure: false,
@@ -340,6 +347,24 @@ final class AppModel {
     }
 
     // MARK: - Connection
+
+    /// Starts Bonjour discovery, which is the app's first local network use.
+    /// Called when the app becomes active (the panel, Settings, or the pairing
+    /// sheet opens) so macOS shows its permission alert at a predictable
+    /// moment instead of at login or when the TV wakes in the background.
+    func primeLocalNetworkAccess(connect: Bool = true) {
+        guard !hasPrimedLocalNetwork else { return }
+        hasPrimedLocalNetwork = true
+        discovery.start()
+        guard connect else { return }
+        Task { [weak self] in
+            await self?.refreshNow(
+                reportFailure: false,
+                timeout: 3,
+                discoveryTimeout: 2
+            )
+        }
+    }
 
     func connectToActiveDeviceIfNeeded() async {
         guard state.identity != nil, let device = state.activeDevice else { return }
@@ -633,6 +658,7 @@ final class AppModel {
 
     /// Current Bonjour address for a paired TV, if it is currently discoverable.
     private func resolvedHost(for device: PairedDevice, timeout: TimeInterval = 5) async -> String? {
+        discovery.start()
         guard let discoveredDevice = discovered.first(where: {
             $0.name == device.name || $0.serviceName == device.name
         }) else {

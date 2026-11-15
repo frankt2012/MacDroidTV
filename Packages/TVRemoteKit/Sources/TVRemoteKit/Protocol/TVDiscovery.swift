@@ -13,7 +13,9 @@ public final class TVDiscovery: @unchecked Sendable {
     public init() {}
 
     public func start() {
-        stop()
+        // Restarting the browser would discard results and repeat the first
+        // local-network access; treat start as idempotent.
+        guard browser == nil else { return }
 
         let parameters = NWParameters.tcp
         parameters.includePeerToPeer = false

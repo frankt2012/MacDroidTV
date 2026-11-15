@@ -50,6 +50,22 @@ struct SettingsView: View {
 
                     Divider()
 
+                    Text("Local Network")
+                        .font(.subheadline.weight(.semibold))
+                    Text("macOS asks for Local Network access the first time you open the remote. If it was denied, or macOS asks again, open Privacy & Security and enable MacDroid TV under Local Network.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("The widget runs separately and asks once the first time you use its buttons. Updates can also ask once more because this build is not notarized.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button("Open Privacy & Security Settings") {
+                        openLocalNetworkSettings()
+                    }
+
+                    Divider()
+
                     Text("Quick apps")
                         .font(.subheadline.weight(.semibold))
                     Text("Choose which app buttons appear in the panel and widget. Up to 8 appear in the widget.")
@@ -197,6 +213,18 @@ struct SettingsView: View {
 
     private var currentVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
+    }
+
+    private func openLocalNetworkSettings() {
+        let candidates = [
+            "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_LocalNetwork",
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork"
+        ]
+        for string in candidates {
+            if let url = URL(string: string), NSWorkspace.shared.open(url) {
+                return
+            }
+        }
     }
 
     private func setLaunchAtLogin(_ enabled: Bool) {

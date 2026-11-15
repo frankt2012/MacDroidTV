@@ -118,6 +118,17 @@ network access. Allow it. Both the app and widget declare
 `NSLocalNetworkUsageDescription` and browse `_androidtvremote2._tcp`; if access
 is denied, discovery and commands fail even though pairing data is intact.
 
+The app requests access when it becomes active — when you open the panel,
+Settings, or pairing — rather than at login or in the background, so the alert
+appears at a predictable moment. The widget runs in its own process and asks
+once the first time you use its buttons.
+
+macOS can ask again after the app is rebuilt, replaced, or updated, especially
+because this build is development-signed and not notarized. If the alert is
+dismissed instead of answered, it also returns on the next connection. Enable
+**MacDroid TV** under **System Settings → Privacy & Security → Local Network**,
+or use the **Open Privacy & Security Settings** button in the app's Settings.
+
 ## Wake-on-LAN and networked standby
 
 The power button can only turn on a TV that stays reachable on the network while it is off. Many TVs drop off Wi-Fi/Ethernet in standby unless a quick-start or networked-standby option is enabled. The app's **Devices → How to keep the TV reachable in standby…** guide covers this in-app.

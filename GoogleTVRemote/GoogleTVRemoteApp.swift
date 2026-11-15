@@ -1,4 +1,5 @@
 import Foundation
+import ServiceManagement
 import SwiftUI
 import TVRemoteKit
 import WidgetKit
@@ -229,6 +230,22 @@ struct GoogleTVRemoteApp: App {
 
         _model = State(initialValue: AppModel())
 
+
+        if let index = CommandLine.arguments.firstIndex(of: "--set-launch-at-login") {
+            let value = CommandLine.arguments.dropFirst(index + 1).first != "0"
+            do {
+                if value {
+                    try SMAppService.mainApp.register()
+                } else {
+                    try SMAppService.mainApp.unregister()
+                }
+                print("launchAtLogin=\(value) status=\(SMAppService.mainApp.status.rawValue)")
+            } catch {
+                print("error=\(error.localizedDescription)")
+                exit(1)
+            }
+            exit(0)
+        }
 
         if let index = CommandLine.arguments.firstIndex(of: "--set-menu-bar") {
             let value = CommandLine.arguments.dropFirst(index + 1).first != "0"
